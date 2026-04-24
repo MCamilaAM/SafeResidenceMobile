@@ -9,14 +9,16 @@ import { Ionicons } from '@expo/vector-icons';
 function InicioResidente({ usuario }) {
   const [modalVisible, setModalVisible] = useState(false);
   
-  // 1. AÑADIMOS LOS NUEVOS CAMPOS AL ESTADO INICIAL
+  // Variable para el menú: elige entre apartamento o área común
+  const [tipoLugar, setTipoLugar] = useState('apartamento'); 
+
   const [reporte, setReporte] = useState({ 
     titulo: '', 
     descripcion: '', 
     categoria: 'Seguridad',
-    torre_incidente: '',
+    torre_incidente: '',      
     apartamento_incidente: '',
-    area_comun: ''
+    area_comun: ''            
   });
 
   const enviarReporte = async () => {
@@ -26,17 +28,19 @@ function InicioResidente({ usuario }) {
     }
 
     try {
-      const IP_COMPUTADORA = '192.168.1.44'; 
+      const IP_COMPUTADORA = '192.168.1.44'; //IP
       
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportar`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        
-        // 2. ACTUALIZAMOS EL "BODY" (EL SOBRE QUE ENVIAMOS)
         body: JSON.stringify({
-          ...reporte, // <-- Esto incluye todo lo que el usuario escribió (título, descripción, y ahora torre_incidente, apartamento_incidente y area_comun)
-          user_id: usuario.id, // Seguimos enviando quién es el que reporta
-          // BORRAMOS: torre: usuario.torre y apartamento: usuario.apartamento
+          ...reporte,
+          // Limpiamos los datos cruzados (si eligió apto, borramos area común y viceversa)
+          area_comun: tipoLugar === 'area_comun' ? reporte.area_comun : null,
+          torre_incidente: tipoLugar === 'apartamento' ? reporte.torre_incidente : null,
+          apartamento_incidente: tipoLugar === 'apartamento' ? reporte.apartamento_incidente : null,
+          
+          user_id: usuario.id, // Con esto Laravel ya sabe quién eres, tu torre y apto personal
           fecha: new Date().toISOString().slice(0, 19).replace('T', ' ')
         })
       });
@@ -46,7 +50,6 @@ function InicioResidente({ usuario }) {
       if (respuesta.ok) {
         Alert.alert('Enviado', 'Tu reporte ha sido recibido por administración.');
         setModalVisible(false);
-        // Limpiamos el formulario al terminar
         setReporte({ titulo: '', descripcion: '', categoria: 'Seguridad', torre_incidente: '', apartamento_incidente: '', area_comun: '' });
       } else {
         Alert.alert('Error', resultado.message || 'No se pudo enviar el reporte.');
@@ -71,120 +74,323 @@ function InicioResidente({ usuario }) {
         </TouchableOpacity>
       </View>
 
-      {/* MODAL DE REPORTE */}
+      {/* MODAL DE REPORTE ARREGLADO */}
       <Modal animationType="slide" transparent={true} visible={modalVisible}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <ScrollView contentContainerStyle={{ backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 25, paddingBottom: 50 }}>
-            
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
-              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#003366' }}>Crear Nuevo Reporte</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}><Ionicons name="close-circle" size={28} color="#666" /></TouchableOpacity>
-            </View>
-
-            <TextInput style={styles.input} placeholder="¿Qué sucede? (Ej. Ruido molesto)" value={reporte.titulo} onChangeText={(t) => setReporte({...reporte, titulo: t})} />
-            
-            <View style={{ backgroundColor: '#F2F6FA', borderRadius: 10, padding: 5, marginBottom: 15 }}>
-              <Text style={{ fontSize: 12, color: '#666', marginLeft: 10, marginTop: 5 }}>Categoría</Text>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 10 }}>
-                {['Seguridad', 'Daño', 'Aseo'].map(cat => (
-                  <TouchableOpacity key={cat} onPress={() => setReporte({...reporte, categoria: cat})} style={{ padding: 8, borderRadius: 8, backgroundColor: reporte.categoria === cat ? '#003366' : 'transparent' }}>
-                    <Text style={{ color: reporte.categoria === cat ? '#FFF' : '#003366', fontWeight: 'bold' }}>{cat}</Text>
-                  </TouchableOpacity>
-                ))}
+          
+          {/* Este View blanco ancla todo abajo y evita que se suba feo */}
+          <View style={{ backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, maxHeight: '90%' }}>
+            <ScrollView contentContainerStyle={{ padding: 25, paddingBottom: 40 }}>
+              
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#003366' }}>Crear Nuevo Reporte</Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}><Ionicons name="close-circle" size={28} color="#666" /></TouchableOpacity>
               </View>
-            </View>
 
-            {/* 3. AÑADIMOS LAS CAJITAS DE TEXTO (TEXTINPUTS) PARA LA UBICACIÓN */}
-            <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#003366', marginBottom: 10 }}>¿Dónde ocurrió? (Opcional)</Text>
-            
-            <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+              <TextInput style={styles.input} placeholder="¿Qué sucede? (Ej. Ruido molesto)" value={reporte.titulo} onChangeText={(t) => setReporte({...reporte, titulo: t})} />
+              
+              <View style={{ backgroundColor: '#F2F6FA', borderRadius: 10, padding: 5, marginBottom: 15 }}>
+                <Text style={{ fontSize: 12, color: '#666', marginLeft: 10, marginTop: 5 }}>Categoría</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 10 }}>
+                  {['Seguridad', 'Daño', 'Aseo'].map(cat => (
+                    <TouchableOpacity key={cat} onPress={() => setReporte({...reporte, categoria: cat})} style={{ padding: 8, borderRadius: 8, backgroundColor: reporte.categoria === cat ? '#003366' : 'transparent' }}>
+                      <Text style={{ color: reporte.categoria === cat ? '#FFF' : '#003366', fontWeight: 'bold' }}>{cat}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* --- INICIO DEL NUEVO MENÚ DE UBICACIÓN --- */}
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#003366', marginBottom: 10 }}>¿Dónde ocurrió el incidente? (Opcional)</Text>
+              
+              <View style={{ flexDirection: 'row', backgroundColor: '#F2F6FA', borderRadius: 10, padding: 4, marginBottom: 15 }}>
+                <TouchableOpacity 
+                  style={{ flex: 1, padding: 10, borderRadius: 8, backgroundColor: tipoLugar === 'apartamento' ? '#003366' : 'transparent', alignItems: 'center' }}
+                  onPress={() => setTipoLugar('apartamento')}
+                >
+                  <Text style={{ fontWeight: 'bold', color: tipoLugar === 'apartamento' ? '#FFF' : '#666' }}>Apartamento</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={{ flex: 1, padding: 10, borderRadius: 8, backgroundColor: tipoLugar === 'area_comun' ? '#003366' : 'transparent', alignItems: 'center' }}
+                  onPress={() => setTipoLugar('area_comun')}
+                >
+                  <Text style={{ fontWeight: 'bold', color: tipoLugar === 'area_comun' ? '#FFF' : '#666' }}>Área Común</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* CONDICIONAL: Muestra una cosa o la otra dependiendo de la pestaña seleccionada */}
+              {tipoLugar === 'apartamento' ? (
+                <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+                  <TextInput style={[styles.input, {width: '48%'}]} placeholder="Torre (Ej. 1)" keyboardType="numeric" value={reporte.torre_incidente} onChangeText={(t) => setReporte({...reporte, torre_incidente: t})} />
+                  <TextInput style={[styles.input, {width: '48%'}]} placeholder="Apto (Ej. 101)" keyboardType="numeric" value={reporte.apartamento_incidente} onChangeText={(t) => setReporte({...reporte, apartamento_incidente: t})} />
+                </View>
+              ) : (
+                <TextInput style={styles.input} placeholder="Ej. Piscina, Lobby, Parqueadero" value={reporte.area_comun} onChangeText={(t) => setReporte({...reporte, area_comun: t})} />
+              )}
+              {/* --- FIN DEL MENÚ --- */}
+
               <TextInput 
-                style={[styles.input, {width: '48%'}]} 
-                placeholder="Torre (Ej. 1)" 
-                keyboardType="numeric" 
-                value={reporte.torre_incidente} 
-                onChangeText={(t) => setReporte({...reporte, torre_incidente: t})} 
+                style={[styles.input, { height: 100, textAlignVertical: 'top' }]} 
+                placeholder="Describe los detalles del incidente..." 
+                multiline={true} 
+                value={reporte.descripcion} 
+                onChangeText={(t) => setReporte({...reporte, descripcion: t})} 
               />
-              <TextInput 
-                style={[styles.input, {width: '48%'}]} 
-                placeholder="Apto (Ej. 101)" 
-                keyboardType="numeric" 
-                value={reporte.apartamento_incidente} 
-                onChangeText={(t) => setReporte({...reporte, apartamento_incidente: t})} 
-              />
-            </View>
 
-            <TextInput 
-              style={styles.input} 
-              placeholder="O escribe un Área Común (Ej. Piscina, Lobby)" 
-              value={reporte.area_comun} 
-              onChangeText={(t) => setReporte({...reporte, area_comun: t})} 
-            />
+              <TouchableOpacity style={styles.btnGuardar} onPress={enviarReporte}>
+                <Text style={styles.btnTexto}>Enviar Reporte</Text>
+              </TouchableOpacity>
 
-            <TextInput 
-              style={[styles.input, { height: 100, textAlignVertical: 'top' }]} 
-              placeholder="Describe los detalles del incidente..." 
-              multiline={true} 
-              value={reporte.descripcion} 
-              onChangeText={(t) => setReporte({...reporte, descripcion: t})} 
-            />
-
-            <TouchableOpacity style={styles.btnGuardar} onPress={enviarReporte}>
-              <Text style={styles.btnTexto}>Enviar Reporte</Text>
-            </TouchableOpacity>
-
-          </ScrollView>
+            </ScrollView>
+          </View>
         </View>
       </Modal>
     </View>
   );
 }
 
+// --- VIGILANTE ---
+// --- VIGILANTE ---
 function InicioVigilante({ usuario }) {
+  const [modalVisible, setModalVisible] = useState(false);
+  const [casos, setCasos] = useState([]);
+
+  // Función para pedir los casos a Laravel
+  const cargarCasosActivos = async () => {
+    try {
+      const IP_COMPUTADORA = '192.168.1.44'; //IP
+      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/activos`);
+      
+      if (!respuesta.ok) {
+        throw new Error('Error de servidor');
+      }
+
+      const datos = await respuesta.json();
+      setCasos(datos);
+      setModalVisible(true);
+    } catch (error) {
+      Alert.alert('Error de conexión', 'Verifica tu IP y que el servidor Laravel esté encendido.');
+    }
+  };
+
+  // Función para que el vigilante tome el caso
+  const tomarCaso = async (idReporte) => {
+    try {
+      const IP_COMPUTADORA = '192.168.1.44'; //IP
+      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/${idReporte}/tomar`, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vigilante_id: usuario.id })
+      });
+
+      if (respuesta.ok) {
+        Alert.alert('Éxito', 'Has tomado este caso. Está en proceso.');
+        setModalVisible(false); // Cerramos el modal
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo tomar el caso.');
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.headerTitle}>Vigilante {usuario.nombre} 👮 </Text>
+      <Text style={styles.headerTitle}>Guardia {usuario.nombre} 👮</Text>
       <View style={styles.row}>
-        <TouchableOpacity style={styles.card} activeOpacity={0.7}>
-          <View style={styles.iconContainer}><Ionicons name="warning" size={40} color="#003366" /></View>
+        
+        {/* BOTÓN 1: CASOS ACTIVOS */}
+        <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={cargarCasosActivos}>
+          <View style={styles.iconContainer}><Ionicons name="warning" size={40} color="#FF9500" /></View>
           <Text style={styles.cardText}>Casos Activos</Text>
           <Text style={styles.cardSubText}>Tomar nuevo caso</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.card} activeOpacity={0.7}>
-          <View style={styles.iconContainer}><Ionicons name="shield-checkmark" size={40} color="#003366" /></View>
+
+        {/* BOTÓN 2: MIS CASOS (RESTAURADO) */}
+        <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={() => Alert.alert('Próximamente', 'Aquí verás los casos que has tomado.')}>
+          <View style={styles.iconContainer}><Ionicons name="shield-checkmark" size={40} color="#34C759" /></View>
           <Text style={styles.cardText}>Mis Casos</Text>
           <Text style={styles.cardSubText}>En proceso</Text>
         </TouchableOpacity>
+
       </View>
+
+      {/* MODAL CASOS ACTIVOS (VIGILANTE) */}
+      <Modal animationType="slide" transparent={true} visible={modalVisible}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', paddingTop: 50 }}>
+          <View style={{ flex: 1, backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#003366' }}>Alertas Abiertas</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}><Ionicons name="close-circle" size={28} color="#666" /></TouchableOpacity>
+            </View>
+
+            <ScrollView>
+              {casos.length === 0 ? <Text style={{textAlign: 'center', marginTop: 20}}>No hay casos activos ✅</Text> : null}
+              {casos.map((caso) => (
+                <View key={caso.id} style={{ backgroundColor: '#F2F6FA', padding: 15, borderRadius: 10, marginBottom: 15 }}>
+                  <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#FF9500' }}>{caso.categoria} - {caso.titulo}</Text>
+                  <Text style={{ fontSize: 13, color: '#666', marginBottom: 5 }}>📍 Lugar: {caso.area_comun ? caso.area_comun : `Torre ${caso.torre_incidente} Apto ${caso.apartamento_incidente}`}</Text>
+                  <Text style={{ fontSize: 13, color: '#666', marginBottom: 10 }}>Reportado por: {caso.residente?.nombre} (Torre {caso.residente?.torre} Apto {caso.residente?.apartamento})</Text>
+                  <Text style={{ fontSize: 12, color: '#888', marginTop: 3, marginBottom: 5, fontStyle: 'italic' }}>🕒 Reportado: {caso.fecha}</Text>
+                  <Text style={{ fontSize: 14, marginBottom: 15 }}>{caso.descripcion}</Text>
+                  
+                  <TouchableOpacity style={[styles.btnGuardar, {backgroundColor: '#34C759', padding: 10, marginTop: 0}]} onPress={() => tomarCaso(caso.id)}>
+                    <Text style={styles.btnTexto}>Tomar Caso</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
+// --- ADMINISTRADOR ---
 function InicioAdmin({ usuario }) {
+  // Estados para Modal de Casos
+  const [modalVisible, setModalVisible] = useState(false);
+  const [casos, setCasos] = useState([]);
+
+  // Estados para Modal de Directorio (NUEVO)
+  const [modalDirectorio, setModalDirectorio] = useState(false);
+  const [residentes, setResidentes] = useState([]);
+
+  // Cargar Todos los Casos
+  const cargarTodosLosCasos = async () => {
+    try {
+      const IP_COMPUTADORA = '192.168.1.44'; //IP
+      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/todos`);
+      if (!respuesta.ok) throw new Error('Error');
+      const datos = await respuesta.json();
+      setCasos(datos);
+      setModalVisible(true);
+    } catch (error) {
+      Alert.alert('Error', 'No se pudieron cargar los casos.');
+    }
+  };
+
+  // Cargar Directorio (NUEVO)
+  const cargarDirectorio = async () => {
+    try {
+      const IP_COMPUTADORA = '192.168.1.44'; //IP
+      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/directorio`);
+      if (!respuesta.ok) throw new Error('Error');
+      const datos = await respuesta.json();
+      setResidentes(datos);
+      setModalDirectorio(true);
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo cargar el directorio.');
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.headerTitle}>Admin {usuario.nombre} 🏢</Text>
+      
       <View style={styles.row}>
-        <TouchableOpacity style={styles.card} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={cargarTodosLosCasos}>
           <View style={styles.iconContainer}><Ionicons name="folder-open" size={40} color="#003366" /></View>
           <Text style={styles.cardText}>Todos los Casos</Text>
           <Text style={styles.cardSubText}>Gestión global</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.card} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={() => Alert.alert('Próximamente', 'Aquí podrás cerrar casos terminados.')}>
           <View style={styles.iconContainer}><Ionicons name="sync-circle" size={40} color="#003366" /></View>
           <Text style={styles.cardText}>Actualizar Estados</Text>
           <Text style={styles.cardSubText}>Cambiar procesos</Text>
         </TouchableOpacity>
       </View>
+      
       <View style={[styles.row, { marginTop: 20 }]}>
-        <TouchableOpacity style={styles.card} activeOpacity={0.7}>
+        {/* BOTÓN DIRECTORIO CON SU NUEVA FUNCIÓN */}
+        <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={cargarDirectorio}>
           <View style={styles.iconContainer}><Ionicons name="people" size={40} color="#003366" /></View>
           <Text style={styles.cardText}>Directorio</Text>
           <Text style={styles.cardSubText}>Info de residentes</Text>
         </TouchableOpacity>
         <View style={{ width: '48%' }} />
       </View>
+
+      {/* MODAL TODOS LOS CASOS (El que ya teníamos) */}
+      <Modal animationType="slide" transparent={true} visible={modalVisible}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', paddingTop: 50 }}>
+          <View style={{ flex: 1, backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#003366' }}>Historial Global</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}><Ionicons name="close-circle" size={28} color="#666" /></TouchableOpacity>
+            </View>
+
+            <ScrollView>
+              {casos.length === 0 ? <Text style={{textAlign: 'center', marginTop: 20}}>No hay reportes en el sistema.</Text> : null}
+              {casos.map((caso) => (
+                <View key={caso.id} style={{ backgroundColor: '#F2F6FA', padding: 15, borderRadius: 10, marginBottom: 15, borderLeftWidth: 5, borderLeftColor: caso.estado === 'Abierto' ? '#FF9500' : '#34C759' }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#003366' }}>{caso.titulo}</Text>
+                    <Text style={{ fontWeight: 'bold', color: caso.estado === 'Abierto' ? '#FF9500' : '#34C759' }}>{caso.estado}</Text>
+                  </View>
+                  <Text style={{ fontSize: 12, color: '#888', marginTop: 5, fontStyle: 'italic' }}>🕒 Reportado: {caso.fecha}</Text>
+                  <Text style={{ fontSize: 12, color: '#666', marginTop: 5 }}>📍 Incidente: {caso.area_comun ? caso.area_comun : `Torre ${caso.torre_incidente} Apto ${caso.apartamento_incidente}`}</Text>
+                  <Text style={{ fontSize: 12, color: '#666' }}>👤 Autor: {caso.residente?.nombre} (T{caso.residente?.torre}-A{caso.residente?.apartamento})</Text>
+                  <Text style={{ fontSize: 14, marginVertical: 8 }}>{caso.descripcion}</Text>
+                  
+                  {caso.vigilante && (
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#003366', backgroundColor: '#E6F0FA', padding: 5, borderRadius: 5 }}>
+                      🛡️ Asignado a: Guardia {caso.vigilante.nombre}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- NUEVO MODAL DIRECTORIO --- */}
+      <Modal animationType="slide" transparent={true} visible={modalDirectorio}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', paddingTop: 50 }}>
+          <View style={{ flex: 1, backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#003366' }}>Directorio de Residentes</Text>
+              <TouchableOpacity onPress={() => setModalDirectorio(false)}><Ionicons name="close-circle" size={28} color="#666" /></TouchableOpacity>
+            </View>
+
+            <ScrollView>
+              {residentes.length === 0 ? <Text style={{textAlign: 'center', marginTop: 20}}>No hay residentes registrados.</Text> : null}
+              {residentes.map((res) => (
+                <View key={res.id} style={{ backgroundColor: '#FFF', padding: 15, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#E0E0E0', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 }}>
+                  
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                    <Ionicons name="person-circle" size={40} color="#003366" />
+                    <View style={{ marginLeft: 10 }}>
+                      <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#003366' }}>{res.nombre} {res.apellidos}</Text>
+                      <Text style={{ fontSize: 13, color: '#666' }}>Torre {res.torre} - Apto {res.apartamento}</Text>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#F2F6FA', padding: 10, borderRadius: 8 }}>
+                    <View style={{ alignItems: 'center', flex: 1 }}>
+                      <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#34C759' }}>{res.casos_reportados}</Text>
+                      <Text style={{ fontSize: 11, color: '#666', textAlign: 'center' }}>Casos{'\n'}Reportados</Text>
+                    </View>
+                    <View style={{ width: 1, backgroundColor: '#CCC' }} />
+                    <View style={{ alignItems: 'center', flex: 1 }}>
+                      {/* Si tiene quejas recibidas en curso, lo ponemos en rojo, si no en gris */}
+                      <Text style={{ fontSize: 18, fontWeight: 'bold', color: res.quejas_recibidas > 0 ? '#FF3B30' : '#666' }}>
+                        {res.quejas_recibidas}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#666', textAlign: 'center' }}>Quejas en{'\n'}su contra</Text>
+                    </View>
+                  </View>
+                  
+                  <Text style={{ fontSize: 12, color: '#888', marginTop: 10 }}>📞 {res.celular} | ✉️ {res.correo}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </ScrollView>
   );
 }
@@ -209,6 +415,47 @@ function PantallaHistorico() { return <View style={styles.center}><Text>Históri
 function PantallaPerfil({ usuario, setUsuario }) {
   const rol = usuario.rol ? usuario.rol.toUpperCase() : 'RESIDENTE';
   
+  // Estados para el Modal de Contraseña
+  const [modalVisible, setModalVisible] = useState(false);
+  const [passwords, setPasswords] = useState({ actual: '', nueva: '', confirmar: '' });
+
+  const cambiarContraseña = async () => {
+    if (!passwords.actual || !passwords.nueva || !passwords.confirmar) {
+      Alert.alert('Atención', 'Por favor llena todos los campos.');
+      return;
+    }
+    if (passwords.nueva !== passwords.confirmar) {
+      Alert.alert('Error', 'La nueva contraseña no coincide con la confirmación.');
+      return;
+    }
+
+    try {
+      const IP_COMPUTADORA = '192.168.1.44'; //IP
+      
+      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/cambiar-password`, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: usuario.id,
+          password_actual: passwords.actual,
+          password_nueva: passwords.nueva
+        })
+      });
+
+      const resultado = await respuesta.json();
+
+      if (respuesta.ok) {
+        Alert.alert('Éxito', 'Tu contraseña ha sido actualizada por seguridad.');
+        setModalVisible(false);
+        setPasswords({ actual: '', nueva: '', confirmar: '' }); // Limpiamos las cajitas
+      } else {
+        Alert.alert('Error', resultado.message || 'No se pudo actualizar la contraseña.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo conectar al servidor.');
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.perfilContainer}>
       <View style={styles.perfilHeader}>
@@ -216,7 +463,6 @@ function PantallaPerfil({ usuario, setUsuario }) {
         <Text style={styles.perfilNombre}>{usuario.nombre} {usuario.apellidos}</Text>
         <Text style={{color: '#34C759', fontWeight: 'bold', marginVertical: 5}}>{rol}</Text>
         
-        {/* Solo muestra Torre y Apto si es residente */}
         {rol === 'RESIDENTE' && (
           <Text style={styles.perfilSub}>Torre {usuario.torre} - Apto {usuario.apartamento}</Text>
         )}
@@ -224,22 +470,72 @@ function PantallaPerfil({ usuario, setUsuario }) {
       </View>
 
       <View style={styles.row}>
-        <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={() => Alert.alert('Próximamente', 'Aquí verás todos tus informes generados.')}>
-          <View style={styles.iconContainer}><Ionicons name="document-text" size={36} color="#003366" /></View>
-          <Text style={styles.cardText}>Mis Informes</Text>
-          <Text style={styles.cardSubText}>Historial personal</Text>
-        </TouchableOpacity>
+        {/* CONDICIONAL: Qué mostrar según el rol */}
+        {rol === 'RESIDENTE' ? (
+          <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={() => Alert.alert('Próximamente', 'Aquí verás todos tus informes generados.')}>
+            <View style={styles.iconContainer}><Ionicons name="document-text" size={36} color="#003366" /></View>
+            <Text style={styles.cardText}>Mis Informes</Text>
+            <Text style={styles.cardSubText}>Historial personal</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={() => Alert.alert('Ajustes', 'Configuración de notificaciones.')}>
+            <View style={styles.iconContainer}><Ionicons name="notifications" size={36} color="#003366" /></View>
+            <Text style={styles.cardText}>Notificaciones</Text>
+            <Text style={styles.cardSubText}>Alertas push</Text>
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={() => Alert.alert('Seguridad', 'Aquí podrás cambiar tu contraseña.')}>
+        <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={() => setModalVisible(true)}>
           <View style={styles.iconContainer}><Ionicons name="lock-closed" size={36} color="#003366" /></View>
           <Text style={styles.cardText}>Contraseña</Text>
-          <Text style={styles.cardSubText}>********</Text>
+          <Text style={styles.cardSubText}>Cambiar clave</Text>
         </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.btnSalir} onPress={() => setUsuario(null)}>
         <Text style={styles.btnTexto}>Cerrar Sesión</Text>
       </TouchableOpacity>
+
+      {/* MODAL DE CAMBIAR CONTRASEÑA */}
+      <Modal animationType="fade" transparent={true} visible={modalVisible}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#FFF', borderRadius: 20, padding: 25 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#003366' }}>Seguridad de Cuenta</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}><Ionicons name="close-circle" size={28} color="#666" /></TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 13, color: '#666', marginBottom: 15 }}>Por seguridad, primero ingresa tu contraseña actual.</Text>
+
+            <TextInput 
+              style={styles.input} 
+              placeholder="Contraseña Actual" 
+              secureTextEntry={true} 
+              value={passwords.actual} 
+              onChangeText={(t) => setPasswords({...passwords, actual: t})} 
+            />
+            <TextInput 
+              style={styles.input} 
+              placeholder="Nueva Contraseña" 
+              secureTextEntry={true} 
+              value={passwords.nueva} 
+              onChangeText={(t) => setPasswords({...passwords, nueva: t})} 
+            />
+            <TextInput 
+              style={styles.input} 
+              placeholder="Confirmar Nueva Contraseña" 
+              secureTextEntry={true} 
+              value={passwords.confirmar} 
+              onChangeText={(t) => setPasswords({...passwords, confirmar: t})} 
+            />
+
+            <TouchableOpacity style={styles.btnGuardar} onPress={cambiarContraseña}>
+              <Text style={styles.btnTexto}>Actualizar Contraseña</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </ScrollView>
   );
 }
@@ -251,7 +547,7 @@ function PantallaAuth({ setUsuario }) {
 
   const procesarFormulario = async () => {
     try {
-      const IP_COMPUTADORA = '192.168.1.44'; 
+      const IP_COMPUTADORA = '192.168.1.44'; //IP
       
       const endpoint = esRegistro ? '/api/registro' : '/api/login';
 
