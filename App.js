@@ -28,7 +28,7 @@ function InicioResidente({ usuario }) {
     }
 
     try {
-      const IP_COMPUTADORA = '192.168.1.44'; //IP.
+      const IP_COMPUTADORA = '172.16.20.181'; //IP.
       
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportar`, {
         method: 'POST',
@@ -151,20 +151,24 @@ function InicioResidente({ usuario }) {
 }
 
 // --- VIGILANTE ---
+
 // --- VIGILANTE ---
 function InicioVigilante({ usuario }) {
+  // Estados para Casos Activos (Nuevos)
   const [modalVisible, setModalVisible] = useState(false);
   const [casos, setCasos] = useState([]);
 
-  // Función para pedir los casos a Laravel
+  // --- NUEVO: Estados para Mis Casos (En Proceso) ---
+  const [modalMisCasosVisible, setModalMisCasosVisible] = useState(false);
+  const [misCasos, setMisCasos] = useState([]);
+
+  // Función para pedir los casos NUEVOS a Laravel
   const cargarCasosActivos = async () => {
     try {
-      const IP_COMPUTADORA = '192.168.1.44'; //IP
+      const IP_COMPUTADORA = '172.16.20.181'; //IP
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/activos`);
       
-      if (!respuesta.ok) {
-        throw new Error('Error de servidor');
-      }
+      if (!respuesta.ok) throw new Error('Error de servidor');
 
       const datos = await respuesta.json();
       setCasos(datos);
@@ -174,10 +178,27 @@ function InicioVigilante({ usuario }) {
     }
   };
 
+  // --- NUEVO: Función para pedir los casos ASIGNADOS AL VIGILANTE ---
+  const cargarMisCasos = async () => {
+    try {
+      const IP_COMPUTADORA = '172.16.20.181'; //IP
+      // Nota: Asegúrate de tener esta ruta creada en tu backend de Laravel
+      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/vigilante/${usuario.id}`);
+      
+      if (!respuesta.ok) throw new Error('Error de servidor');
+
+      const datos = await respuesta.json();
+      setMisCasos(datos);
+      setModalMisCasosVisible(true); // Abre el nuevo modal
+    } catch (error) {
+      Alert.alert('Error de conexión', 'No se pudieron cargar tus casos en proceso.');
+    }
+  };
+
   // Función para que el vigilante tome el caso
   const tomarCaso = async (idReporte) => {
     try {
-      const IP_COMPUTADORA = '192.168.1.44'; //IP
+      const IP_COMPUTADORA = '172.16.20.181'; //IP
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/${idReporte}/tomar`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
@@ -193,6 +214,20 @@ function InicioVigilante({ usuario }) {
     }
   };
 
+  const formatearFecha = (fechaCruda) => {
+    if (!fechaCruda) return '';
+    let fechaCorregida = fechaCruda;
+    if (!fechaCruda.includes('T')) {
+      fechaCorregida = fechaCruda.replace(' ', 'T') + 'Z';
+    }
+    const fecha = new Date(fechaCorregida);
+    return fecha.toLocaleString('es-CO', {
+      timeZone: 'America/Bogota',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: true 
+    });
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.headerTitle}>Guardia {usuario.nombre} 👮</Text>
@@ -205,16 +240,18 @@ function InicioVigilante({ usuario }) {
           <Text style={styles.cardSubText}>Tomar nuevo caso</Text>
         </TouchableOpacity>
 
-        {/* BOTÓN 2: MIS CASOS (RESTAURADO) */}
-        <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={() => Alert.alert('Próximamente', 'Aquí verás los casos que has tomado.')}>
-          <View style={styles.iconContainer}><Ionicons name="shield-checkmark" size={40} color="#34C759" /></View>
+        {/* BOTÓN 2: MIS CASOS (CORREGIDO) */}
+        <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={cargarMisCasos}>
+          <View style={styles.iconContainer}>
+            <Ionicons name="shield-checkmark" size={40} color="#34C759" />
+          </View>
           <Text style={styles.cardText}>Mis Casos</Text>
           <Text style={styles.cardSubText}>En proceso</Text>
         </TouchableOpacity>
 
       </View>
 
-      {/* MODAL CASOS ACTIVOS (VIGILANTE) */}
+      {/* --- MODAL 1: CASOS ACTIVOS (NUEVOS) --- */}
       <Modal animationType="slide" transparent={true} visible={modalVisible}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', paddingTop: 50 }}>
           <View style={{ flex: 1, backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20 }}>
@@ -230,7 +267,7 @@ function InicioVigilante({ usuario }) {
                   <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#FF9500' }}>{caso.categoria} - {caso.titulo}</Text>
                   <Text style={{ fontSize: 13, color: '#666', marginBottom: 5 }}>📍 Lugar: {caso.area_comun ? caso.area_comun : `Torre ${caso.torre_incidente} Apto ${caso.apartamento_incidente}`}</Text>
                   <Text style={{ fontSize: 13, color: '#666', marginBottom: 10 }}>Reportado por: {caso.residente?.nombre} (Torre {caso.residente?.torre} Apto {caso.residente?.apartamento})</Text>
-                  <Text style={{ fontSize: 12, color: '#888', marginTop: 3, marginBottom: 5, fontStyle: 'italic' }}>🕒 Reportado: {caso.fecha}</Text>
+                  <Text style={{ fontSize: 12, color: '#888', marginTop: 3, marginBottom: 5, fontStyle: 'italic' }}>🕒 Reportado: {formatearFecha(caso.fecha)}</Text>
                   <Text style={{ fontSize: 14, marginBottom: 15 }}>{caso.descripcion}</Text>
                   
                   <TouchableOpacity style={[styles.btnGuardar, {backgroundColor: '#34C759', padding: 10, marginTop: 0}]} onPress={() => tomarCaso(caso.id)}>
@@ -242,6 +279,37 @@ function InicioVigilante({ usuario }) {
           </View>
         </View>
       </Modal>
+
+      {/* --- MODAL 2: MIS CASOS (EN PROCESO) NUEVO --- */}
+      <Modal animationType="slide" transparent={true} visible={modalMisCasosVisible}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', paddingTop: 50 }}>
+          <View style={{ flex: 1, backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#003366' }}>Mis Casos en Proceso</Text>
+              <TouchableOpacity onPress={() => setModalMisCasosVisible(false)}><Ionicons name="close-circle" size={28} color="#666" /></TouchableOpacity>
+            </View>
+
+            <ScrollView>
+              {misCasos.length === 0 ? <Text style={{textAlign: 'center', marginTop: 20}}>No tienes casos asignados actualmente. 🛡️</Text> : null}
+              {misCasos.map((caso) => (
+                <View key={caso.id} style={{ backgroundColor: '#F2F6FA', padding: 15, borderRadius: 10, marginBottom: 15, borderLeftWidth: 5, borderLeftColor: '#34C759' }}>
+                  <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#003366' }}>{caso.categoria} - {caso.titulo}</Text>
+                  <Text style={{ fontSize: 13, color: '#666', marginBottom: 5 }}>📍 Lugar: {caso.area_comun ? caso.area_comun : `Torre ${caso.torre_incidente} Apto ${caso.apartamento_incidente}`}</Text>
+                  <Text style={{ fontSize: 13, color: '#666', marginBottom: 10 }}>Reportado por: {caso.residente?.nombre}</Text>
+                  <Text style={{ fontSize: 12, color: '#888', marginTop: 3, marginBottom: 5, fontStyle: 'italic' }}>🕒 Reportado: {formatearFecha(caso.fecha)}</Text>
+                  <Text style={{ fontSize: 14, marginBottom: 15 }}>{caso.descripcion}</Text>
+                  
+                  {/* Botón para resolver el caso (opcional, por si quieres implementarlo luego) */}
+                  <TouchableOpacity style={[styles.btnGuardar, {backgroundColor: '#003366', padding: 10, marginTop: 0}]} onPress={() => Alert.alert('Próximamente', 'Aquí podrás marcar el caso como resuelto.')}>
+                    <Text style={styles.btnTexto}>Finalizar Caso</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -259,7 +327,7 @@ function InicioAdmin({ usuario }) {
   // Cargar Todos los Casos
   const cargarTodosLosCasos = async () => {
     try {
-      const IP_COMPUTADORA = '192.168.1.44'; //IP
+      const IP_COMPUTADORA = '172.16.20.181'; //IP
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/todos`);
       if (!respuesta.ok) throw new Error('Error');
       const datos = await respuesta.json();
@@ -273,7 +341,7 @@ function InicioAdmin({ usuario }) {
   // Cargar Directorio (NUEVO)
   const cargarDirectorio = async () => {
     try {
-      const IP_COMPUTADORA = '192.168.1.44'; //IP
+      const IP_COMPUTADORA = '172.16.20.181'; //IP
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/directorio`);
       if (!respuesta.ok) throw new Error('Error');
       const datos = await respuesta.json();
@@ -282,6 +350,30 @@ function InicioAdmin({ usuario }) {
     } catch (error) {
       Alert.alert('Error', 'No se pudo cargar el directorio.');
     }
+  };
+
+  const formatearFecha = (fechaCruda) => {
+    if (!fechaCruda) return '';
+
+    // 1. Reemplazamos el espacio por 'T' y le pegamos la 'Z' al final
+    // Esto convierte "2026-05-06 13:00:00" en "2026-05-06T13:00:00Z"
+    let fechaCorregida = fechaCruda;
+    if (!fechaCruda.includes('T')) {
+      fechaCorregida = fechaCruda.replace(' ', 'T') + 'Z';
+    }
+
+    // 2. Ahora sí, JavaScript sabe que debe restarle 5 horas
+    const fecha = new Date(fechaCorregida);
+
+    return fecha.toLocaleString('es-CO', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true 
+    });
   };
 
   return (
@@ -329,7 +421,7 @@ function InicioAdmin({ usuario }) {
                     <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#003366' }}>{caso.titulo}</Text>
                     <Text style={{ fontWeight: 'bold', color: caso.estado === 'Abierto' ? '#FF9500' : '#34C759' }}>{caso.estado}</Text>
                   </View>
-                  <Text style={{ fontSize: 12, color: '#888', marginTop: 5, fontStyle: 'italic' }}>🕒 Reportado: {caso.fecha}</Text>
+                  <Text style={{ fontSize: 12, color: '#888', marginTop: 5, fontStyle: 'italic' }}>🕒 Reportado: {formatearFecha(caso.fecha)}</Text>
                   <Text style={{ fontSize: 12, color: '#666', marginTop: 5 }}>📍 Incidente: {caso.area_comun ? caso.area_comun : `Torre ${caso.torre_incidente} Apto ${caso.apartamento_incidente}`}</Text>
                   <Text style={{ fontSize: 12, color: '#666' }}>👤 Autor: {caso.residente?.nombre} (T{caso.residente?.torre}-A{caso.residente?.apartamento})</Text>
                   <Text style={{ fontSize: 14, marginVertical: 8 }}>{caso.descripcion}</Text>
@@ -430,7 +522,7 @@ function PantallaPerfil({ usuario, setUsuario }) {
     }
 
     try {
-      const IP_COMPUTADORA = '192.168.1.44'; //IP
+      const IP_COMPUTADORA = '172.16.20.181'; //IP
       
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/cambiar-password`, {
         method: 'POST',
@@ -547,7 +639,7 @@ function PantallaAuth({ setUsuario }) {
 
   const procesarFormulario = async () => {
     try {
-      const IP_COMPUTADORA = '192.168.1.44'; //IP
+      const IP_COMPUTADORA = '172.16.20.181'; //IP
       
       const endpoint = esRegistro ? '/api/registro' : '/api/login';
 
