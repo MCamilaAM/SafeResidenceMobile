@@ -28,7 +28,7 @@ function InicioResidente({ usuario }) {
     }
 
     try {
-      const IP_COMPUTADORA = '192.168.1.44'; //IP
+      const IP_COMPUTADORA = '192.168.1.44'; //IP.
       
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportar`, {
         method: 'POST',
