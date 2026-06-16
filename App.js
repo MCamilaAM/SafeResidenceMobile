@@ -1,12 +1,11 @@
-import React, { useState, createContext, useContext } from 'react';
+import React, { useState, createContext, useContext, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, Alert, Platform, Dimensions, StyleSheet} from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { PieChart, BarChart } from 'react-native-chart-kit'; 
 
 // --- 1. PANTALLAS DE INICIO POR ROL ---
-
 function InicioResidente({ usuario }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [tipoLugar, setTipoLugar] = useState('apartamento'); 
@@ -15,39 +14,25 @@ function InicioResidente({ usuario }) {
   const [misReportes, setMisReportes] = useState([]);
 
   const enviarReporte = async () => {
-    // 1. Validar primero que los campos obligatorios existan
-    if (!reporte.titulo || !reporte.descripcion) {
-      return Alert.alert('Atención', 'Llena título y descripción.');
-    }
-
-    // 2. Intentar el envío real al servidor de Laravel
+    if (!reporte.titulo || !reporte.descripcion) return Alert.alert('Atención', 'Llena título y descripción.');
     try {
       const IP_COMPUTADORA = '192.168.1.44'; 
-      
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportar`, {
         method: 'POST',
-        headers: { 
-          'Accept': 'application/json', 
-          'Content-Type': 'application/json' 
-        },
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...reporte,
-          // Limpiamos los datos cruzados (si eligió apto, borramos area común y viceversa)
           area_comun: tipoLugar === 'area_comun' ? reporte.area_comun : null,
           torre_incidente: tipoLugar === 'apartamento' ? reporte.torre_incidente : null,
           apartamento_incidente: tipoLugar === 'apartamento' ? reporte.apartamento_incidente : null,
-          
-          user_id: usuario?.id, // Con esto Laravel ya sabe quién eres (Uso de ? para evitar crash si es indefinido)
+          user_id: usuario?.id,
           fecha: new Date().toISOString().slice(0, 19).replace('T', ' ')
         })
       });
-
       const resultado = await respuesta.json();
-
       if (respuesta.ok) {
         Alert.alert('Enviado', 'Tu reporte ha sido recibido por administración.');
         setModalVisible(false);
-        // Reseteamos el formulario
         setReporte({ titulo: '', descripcion: '', categoria: 'Seguridad', torre_incidente: '', apartamento_incidente: '', area_comun: '' });
       } else {
         Alert.alert('Error', resultado.message || 'No se pudo enviar el reporte.');
@@ -58,18 +43,17 @@ function InicioResidente({ usuario }) {
   };
 
   const cargarMisReportes = async () => {
-    setMisReportes([
-      { 
-        id: 1, 
-        titulo: 'Ruido excesivo', 
-        categoria: 'Seguridad', 
-        estado: 'En Proceso', 
-        fecha: '2026-05-10 22:30', 
-        descripcion: 'Música muy alta. No dejan dormir.', 
-        historial: [{ id: 101, fecha: '2026-05-10 22:45', mensaje: 'Reporte recibido. Asignando guardia.' }] 
-      }
-    ]);
-    setModalEstadoVisible(true);
+    if (!usuario?.id) return;
+    try {
+      const IP_COMPUTADORA = '192.168.1.44'; 
+      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/residente/${usuario.id}`);
+      if (!respuesta.ok) throw new Error('Error del servidor');
+      const datos = await respuesta.json();
+      setMisReportes(datos);
+      setModalEstadoVisible(true);
+    } catch (error) {
+      Alert.alert('Error de conexión', 'No se pudieron cargar tus reportes.');
+    }
   };
 
   return (
@@ -90,8 +74,6 @@ function InicioResidente({ usuario }) {
 
       <ScrollView contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.actionBlock, { marginTop: 15 }]}> 
-          
-          {/* BOTÓN NUEVO REPORTE */}
           <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={() => setModalVisible(true)}>
             <View style={styles.profileOptionIconContainer}><Ionicons name="add-circle" size={24} color="#00264D" /></View>
             <View style={styles.actionTextGroup}>
@@ -100,10 +82,7 @@ function InicioResidente({ usuario }) {
             </View>
             <Ionicons name="chevron-forward" size={20} color="#CCC" />
           </TouchableOpacity>
-
           <View style={styles.separator} />
-
-          {/* BOTÓN MIS REPORTES */}
           <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={cargarMisReportes}>
             <View style={styles.profileOptionIconContainer}><Ionicons name="search" size={24} color="#00264D" /></View>
             <View style={styles.actionTextGroup}>
@@ -112,11 +91,10 @@ function InicioResidente({ usuario }) {
             </View>
             <Ionicons name="chevron-forward" size={20} color="#CCC" />
           </TouchableOpacity>
-
         </View>
       </ScrollView>
 
-      {/* --- MODAL: CREAR NUEVO REPORTE --- */}
+      {/* --- MODAL: CREAR NUEVO REPORTE (Sin cambios) --- */}
       <Modal animationType="slide" transparent={true} visible={modalVisible}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
           <View style={{ backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, maxHeight: '90%', padding: 25 }}>
@@ -169,7 +147,7 @@ function InicioResidente({ usuario }) {
         </View>
       </Modal>
 
-      {/* --- MODAL DE SEGUIMIENTO (MIS REPORTES) --- */}
+      {/* --- MODAL DE SEGUIMIENTO (MIS REPORTES DINÁMICOS) --- */}
       <Modal animationType="slide" transparent={true} visible={modalEstadoVisible}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', paddingTop: 50 }}>
           <View style={{ flex: 1, backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20 }}>
@@ -178,13 +156,29 @@ function InicioResidente({ usuario }) {
               <TouchableOpacity onPress={() => setModalEstadoVisible(false)}><Ionicons name="close-circle" size={28} color="#666" /></TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
+              {misReportes.length === 0 ? <Text style={{textAlign: 'center', marginTop: 20, color: '#666'}}>No tienes reportes creados actualmente ✅</Text> : null}
               {misReportes.map((caso) => (
                 <View key={caso.id} style={{ backgroundColor: '#F8F9FA', padding: 18, borderRadius: 15, marginBottom: 18, borderWidth: 1, borderColor: '#E1E8EE' }}>
                   <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#00264D' }}>{caso.categoria} - {caso.titulo}</Text>
-                  <Text style={{ fontSize: 12, color: '#34C759', fontWeight: 'bold', marginVertical: 5 }}>ESTADO: {caso.estado?.toUpperCase() || 'PENDIENTE'}</Text>
+                  <Text style={{ fontSize: 12, color: caso.estado === 'Resuelto' || caso.estado === 'Terminado' ? '#34C759' : '#FF9500', fontWeight: 'bold', marginVertical: 5 }}>ESTADO: {caso.estado?.toUpperCase() || 'PENDIENTE'}</Text>
+                  
+                  {/* BITÁCORA DEL RESIDENTE */}
                   <View style={{ backgroundColor: '#FFF', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#E1E8EE', marginTop: 10 }}>
-                    <Text style={{ fontSize: 12, color: '#667788', fontWeight: 'bold', borderLeftWidth: 3, borderLeftColor: '#003366', paddingLeft: 8 }}>Reporte recibido por administración.</Text>
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#00264D', marginBottom: 5 }}>Bitácora de seguridad:</Text>
+                    
+                    {caso.novedades && caso.novedades.length > 0 ? (
+                      caso.novedades.map((nov, i) => (
+                        <Text key={i} style={{ fontSize: 12, color: '#667788', borderLeftWidth: 2, borderLeftColor: '#003366', paddingLeft: 8, marginBottom: 6 }}>
+                          {nov.mensaje} <Text style={{fontSize: 10, color: '#999'}}>- {nov.usuario?.nombre || 'Staff'}</Text>
+                        </Text>
+                      ))
+                    ) : (
+                      <Text style={{ fontSize: 12, color: '#667788', borderLeftWidth: 2, borderLeftColor: '#003366', paddingLeft: 8 }}>
+                        Reporte recibido. A la espera de revisión.
+                      </Text>
+                    )}
                   </View>
+
                 </View>
               ))}
             </ScrollView>
@@ -195,21 +189,22 @@ function InicioResidente({ usuario }) {
   );
 };
 
-// --- 3. PANTALLA INICIO VIGILANTE ---
+// --- 2. PANTALLA INICIO VIGILANTE ---
 function InicioVigilante({ usuario }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [casos, setCasos] = useState([]);
   const [modalMisCasosVisible, setModalMisCasosVisible] = useState(false);
   const [misCasos, setMisCasos] = useState([]);
+  
+  // NUEVO ESTADO para enviar novedades
+  const [nuevaNovedad, setNuevaNovedad] = useState('');
 
   const IP_COMPUTADORA = '192.168.1.44';
 
-  // Función para pedir los casos NUEVOS a Laravel
   const cargarCasosActivos = async () => {
     try {
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/activos`);
       if (!respuesta.ok) throw new Error('Error de servidor');
-
       const datos = await respuesta.json();
       setCasos(datos);
       setModalVisible(true);
@@ -218,12 +213,10 @@ function InicioVigilante({ usuario }) {
     }
   };
 
-  // Función para pedir los casos ASIGNADOS al vigilante
   const cargarMisCasos = async () => {
     try {
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/vigilante/${usuario?.id}`);
       if (!respuesta.ok) throw new Error('Error de servidor');
-
       const datos = await respuesta.json();
       setMisCasos(datos);
       setModalMisCasosVisible(true);
@@ -232,16 +225,14 @@ function InicioVigilante({ usuario }) {
     }
   };
 
-  // Función para que el vigilante tome un caso abierto
   const tomarCaso = async (idReporte) => {
-    if (!usuario?.id) return Alert.alert('Error', 'No se pudo identificar las credenciales del vigilante.');
+    if (!usuario?.id) return Alert.alert('Error', 'No se pudo identificar las credenciales.');
     try {
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/${idReporte}/tomar`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ vigilante_id: usuario.id })
       });
-
       if (respuesta.ok) {
         Alert.alert('Éxito', 'Has tomado este caso. Está en proceso.');
         setModalVisible(false);
@@ -253,18 +244,31 @@ function InicioVigilante({ usuario }) {
     }
   };
 
-  // Formateador de fechas para los datos provenientes de Laravel
+  // NUEVA FUNCIÓN: Enviar Novedad (Solo en "Mis Casos")
+  const enviarNovedad = async (idReporte) => {
+    if (!nuevaNovedad) return Alert.alert('Atención', 'Escribe una novedad primero.');
+    try {
+      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/${idReporte}/novedad`, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: usuario.id, mensaje: nuevaNovedad })
+      });
+      if (respuesta.ok) {
+        setNuevaNovedad('');
+        cargarMisCasos(); // Refrescar para ver el mensaje recién enviado
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo enviar la actualización.');
+    }
+  };
+
   const formatearFecha = (fechaCruda) => {
     if (!fechaCruda) return '';
     let fechaCorregida = fechaCruda;
-    if (!fechaCruda.includes('T')) {
-      fechaCorregida = fechaCruda.replace(' ', 'T') + 'Z';
-    }
+    if (!fechaCruda.includes('T')) fechaCorregida = fechaCruda.replace(' ', 'T') + 'Z';
     const fecha = new Date(fechaCorregida);
     return fecha.toLocaleString('es-CO', {
-      timeZone: 'America/Bogota',
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', hour12: true 
+      timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true 
     });
   };
 
@@ -285,31 +289,27 @@ function InicioVigilante({ usuario }) {
 
       <ScrollView contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.actionBlock, { marginTop: 15 }]}>
-          
           <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={cargarCasosActivos}>
-            <View style={styles.profileOptionIconContainer}><Ionicons name="warning" size={24} color="#FF9500" /></View>
+            <View style={styles.profileOptionIconContainer}><Ionicons name="warning" size={24} color="#00264D" /></View>
             <View style={styles.actionTextGroup}>
               <Text style={styles.profileOptionTitle}>Casos Activos</Text>
               <Text style={styles.actionDesc}>Alertas sin asignar</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#CCC" />
           </TouchableOpacity>
-
           <View style={styles.separator} />
-
           <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={cargarMisCasos}>
-            <View style={styles.profileOptionIconContainer}><Ionicons name="shield-checkmark" size={24} color="#34C759" /></View>
+            <View style={styles.profileOptionIconContainer}><Ionicons name="shield-checkmark" size={24} color="#00264D" /></View>
             <View style={styles.actionTextGroup}>
               <Text style={styles.profileOptionTitle}>Mis Casos</Text>
               <Text style={styles.actionDesc}>Novedades en proceso</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#CCC" />
           </TouchableOpacity>
-
         </View>
       </ScrollView>
 
-      {/* MODAL: CASOS ACTIVOS */}
+      {/* MODAL: CASOS ACTIVOS (Sin cambios) */}
       <Modal animationType="slide" transparent={true} visible={modalVisible}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', paddingTop: 50 }}>
           <View style={{ flex: 1, backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20 }}>
@@ -337,7 +337,7 @@ function InicioVigilante({ usuario }) {
         </View>
       </Modal>
 
-      {/* MODAL: MIS CASOS (EN PROCESO) */}
+      {/* MODAL: MIS CASOS (Actualizado para enviar novedades) */}
       <Modal animationType="slide" transparent={true} visible={modalMisCasosVisible}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', paddingTop: 50 }}>
           <View style={{ flex: 1, backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20 }}>
@@ -354,9 +354,26 @@ function InicioVigilante({ usuario }) {
                   <Text style={{ fontSize: 12, color: '#888', marginVertical: 4, fontStyle: 'italic' }}>🕒 Asignado: {formatearFecha(caso.fecha)}</Text>
                   <Text style={{ fontSize: 14, marginVertical: 10, color: '#333' }}>"{caso.descripcion}"</Text>
                   
-                  <TouchableOpacity style={[styles.btnGuardar, {backgroundColor: '#003366', paddingVertical: 12, marginTop: 0}]} onPress={() => Alert.alert('Simulación', 'Caso cerrado exitosamente.')}>
-                    <Text style={styles.btnTexto}>Finalizar Novedad</Text>
-                  </TouchableOpacity>
+                  {/* VER NOVEDADES */}
+                  <View style={{ backgroundColor: '#FFF', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#C8E6C9', marginBottom: 10 }}>
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#00264D', marginBottom: 5 }}>Actualizaciones del caso:</Text>
+                    {caso.novedades && caso.novedades.length > 0 ? (
+                      caso.novedades.map((nov, i) => (
+                        <Text key={i} style={{ fontSize: 12, color: '#555', marginBottom: 3 }}>
+                          <Text style={{fontWeight: 'bold'}}>{nov.usuario?.nombre || 'Staff'}: </Text>{nov.mensaje}
+                        </Text>
+                      ))
+                    ) : <Text style={{ fontSize: 12, color: '#999', fontStyle: 'italic' }}>Sin novedades registradas.</Text>}
+                  </View>
+
+                  {/* INGRESAR NUEVA NOVEDAD */}
+                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                    <TextInput style={[styles.input, {flex: 1, marginBottom: 0, height: 45, paddingVertical: 10, fontSize: 13}]} placeholder="Registrar novedad..." value={nuevaNovedad} onChangeText={setNuevaNovedad} />
+                    <TouchableOpacity style={{backgroundColor: '#003366', padding: 10, borderRadius: 10, marginLeft: 5}} onPress={() => enviarNovedad(caso.id)}>
+                      <Ionicons name="add" size={18} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+                  
                 </View>
               ))}
             </ScrollView>
@@ -367,22 +384,35 @@ function InicioVigilante({ usuario }) {
   );
 }
 
-// --- 4. PANTALLA INICIO ADMINISTRADOR ---
+// --- 3. PANTALLA INICIO ADMINISTRADOR ---
 function InicioAdmin({ usuario }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [casos, setCasos] = useState([]);
   const [modalDirectorio, setModalDirectorio] = useState(false);
   const [residentes, setResidentes] = useState([]);
+  const [nuevaNovedad, setNuevaNovedad] = useState(''); 
+
+  // Estados para el formulario de cierre y llamados de atención
+  const [modalCierre, setModalCierre] = useState(false);
+  const [datosCierre, setDatosCierre] = useState({ idReporte: null, solucion: '', aplicarLlamado: false, torre: '', apto: '' });
 
   const IP_COMPUTADORA = '192.168.1.44';
 
-  // Cargar Todos los Casos desde Laravel
   const cargarTodosLosCasos = async () => {
     try {
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/todos`);
       if (!respuesta.ok) throw new Error('Error al obtener los casos');
 
-      const datos = await respuesta.json();
+      let datos = await respuesta.json();
+
+      // LÓGICA DE ORDENAMIENTO: Activos primero, luego cerrados, ordenados de más nuevo a más viejo
+      datos = datos.sort((a, b) => {
+        const cerradoA = (a.estado === 'Resuelto' || a.estado === 'Terminado') ? 1 : 0;
+        const cerradoB = (b.estado === 'Resuelto' || b.estado === 'Terminado') ? 1 : 0;
+        if (cerradoA !== cerradoB) return cerradoA - cerradoB;
+        return new Date(b.fecha) - new Date(a.fecha);
+      });
+
       setCasos(datos);
       setModalVisible(true);
     } catch (error) {
@@ -390,7 +420,64 @@ function InicioAdmin({ usuario }) {
     }
   };
 
-  // Cargar Directorio de Residentes desde Laravel
+  // Abre el modal para redactar la conclusión y aplicar sanciones
+  const abrirModalCierre = (idReporte) => {
+    setDatosCierre({ idReporte, solucion: '', aplicarLlamado: false, torre: '', apto: '' });
+    setModalCierre(true);
+  };
+
+  // Envía los datos de finalización a Laravel
+  const confirmarCierre = async () => {
+    if (!datosCierre.solucion) return Alert.alert('Atención', 'Debes registrar la conclusión del caso.');
+    if (datosCierre.aplicarLlamado && (!datosCierre.torre || !datosCierre.apto)) {
+      return Alert.alert('Atención', 'Ingresa la torre y apartamento a sancionar.');
+    }
+
+    try {
+      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/${datosCierre.idReporte}/cerrar`, {
+        method: 'PUT',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_id: usuario.id,
+          solucion: datosCierre.solucion,
+          aplicar_llamado: datosCierre.aplicarLlamado,
+          torre: datosCierre.torre,
+          apto: datosCierre.apto
+        })
+      });
+
+      const resultado = await respuesta.json();
+      
+      if (respuesta.ok) {
+        Alert.alert('Caso Cerrado', resultado.mensaje);
+        setModalCierre(false);
+        cargarTodosLosCasos(); 
+      } else {
+        Alert.alert('Aviso', resultado.mensaje || 'Hubo un error.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo conectar al servidor.');
+    }
+  };
+
+  const enviarNovedad = async (idReporte) => {
+    if (!nuevaNovedad) return Alert.alert('Atención', 'Escribe una novedad primero.');
+    try {
+      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/${idReporte}/novedad`, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: usuario.id, mensaje: nuevaNovedad })
+      });
+      if (respuesta.ok) {
+        setNuevaNovedad('');
+        cargarTodosLosCasos(); 
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo enviar la actualización.');
+    }
+  };
+
+  // Carga el Directorio de usuarios desde la base de datos
   const cargarDirectorio = async () => {
     try {
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/directorio`);
@@ -404,18 +491,13 @@ function InicioAdmin({ usuario }) {
     }
   };
 
-  // Formateador de fechas para unificar la visualización en el panel administrador
   const formatearFecha = (fechaCruda) => {
     if (!fechaCruda) return '';
     let fechaCorregida = fechaCruda;
-    if (!fechaCruda.includes('T')) {
-      fechaCorregida = fechaCruda.replace(' ', 'T') + 'Z';
-    }
+    if (!fechaCruda.includes('T')) fechaCorregida = fechaCruda.replace(' ', 'T') + 'Z';
     const fecha = new Date(fechaCorregida);
     return fecha.toLocaleString('es-CO', {
-      timeZone: 'America/Bogota',
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', hour12: true 
+      timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true 
     });
   };
 
@@ -437,6 +519,7 @@ function InicioAdmin({ usuario }) {
       <ScrollView contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.actionBlock, { marginTop: 15 }]}>
           
+          {/* BOTÓN 1: VER TODOS LOS CASOS */}
           <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={cargarTodosLosCasos}>
             <View style={styles.profileOptionIconContainer}><Ionicons name="folder-open" size={24} color="#00264D" /></View>
             <View style={styles.actionTextGroup}>
@@ -448,6 +531,7 @@ function InicioAdmin({ usuario }) {
 
           <View style={styles.separator} />
 
+          {/* BOTÓN 2: RESTAURADO EL DIRECTORIO DE RESIDENTES */}
           <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={cargarDirectorio}>
             <View style={styles.profileOptionIconContainer}><Ionicons name="people" size={24} color="#00264D" /></View>
             <View style={styles.actionTextGroup}>
@@ -460,7 +544,7 @@ function InicioAdmin({ usuario }) {
         </View>
       </ScrollView>
 
-      {/* MODAL: TODOS LOS CASOS */}
+      {/* --- MODAL 1: HISTORIAL DE TODOS LOS CASOS --- */}
       <Modal animationType="slide" transparent={true} visible={modalVisible}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', paddingTop: 50 }}>
           <View style={{ flex: 1, backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20 }}>
@@ -469,33 +553,107 @@ function InicioAdmin({ usuario }) {
               <TouchableOpacity onPress={() => setModalVisible(false)}><Ionicons name="close-circle" size={28} color="#666" /></TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {casos.length === 0 ? <Text style={{textAlign: 'center', marginTop: 20, color: '#666'}}>No se registran casos en el sistema 📁</Text> : null}
-              {casos.map((caso) => (
-                <View key={caso.id} style={{ backgroundColor: '#F8F9FA', padding: 18, borderRadius: 15, marginBottom: 18, borderWidth: 1, borderColor: '#E1E8EE', borderLeftWidth: 5, borderLeftColor: caso.estado === 'Terminado' || caso.estado === 'Resuelto' ? '#34C759' : '#FF9500' }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#00264D' }}>{caso.titulo}</Text>
-                    <Text style={{ fontWeight: 'bold', fontSize: 12, color: caso.estado === 'Terminado' || caso.estado === 'Resuelto' ? '#34C759' : '#FF9500' }}>{caso.estado?.toUpperCase() || 'PENDIENTE'}</Text>
+              {casos.length === 0 ? <Text style={{textAlign: 'center', marginTop: 20, color: '#666'}}>No se registran casos en el sistema</Text> : null}
+              {casos.map((caso) => {
+                const esCerrado = caso.estado === 'Resuelto' || caso.estado === 'Terminado';
+                return (
+                  <View key={caso.id} style={{ backgroundColor: '#F8F9FA', padding: 18, borderRadius: 15, marginBottom: 18, borderWidth: 1, borderColor: '#E1E8EE', borderLeftWidth: 5, borderLeftColor: esCerrado ? '#666' : '#FF9500' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#00264D' }}>{caso.titulo}</Text>
+                      <Text style={{ fontWeight: 'bold', fontSize: 12, color: esCerrado ? '#666' : '#FF9500' }}>{caso.estado?.toUpperCase() || 'PENDIENTE'}</Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: '#666', marginTop: 5 }}>📍 {caso.area_comun ? caso.area_comun : `T${caso.torre_incidente} - Apto ${caso.apartamento_incidente}`}</Text>
+                    {caso.fecha && <Text style={{ fontSize: 11, color: '#888', fontStyle: 'italic' }}>🕒 Registro: {formatearFecha(caso.fecha)}</Text>}
+                    <Text style={{ fontSize: 14, color: '#333', marginTop: 10, marginBottom: 10 }}>{caso.descripcion}</Text>
+
+                    {/* SECCIÓN DE NOVEDADES */}
+                    <View style={{ backgroundColor: '#FFF', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#E1E8EE', marginBottom: 10 }}>
+                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#00264D', marginBottom: 5 }}>Actualizaciones:</Text>
+                      {caso.novedades && caso.novedades.length > 0 ? (
+                        caso.novedades.map((nov, i) => (
+                          <Text key={i} style={{ fontSize: 12, color: nov.mensaje.includes('DECISIÓN') ? '#00264D' : '#555', fontWeight: nov.mensaje.includes('DECISIÓN') ? 'bold' : 'normal', marginBottom: 3 }}>
+                            <Text style={{fontWeight: 'bold'}}>{nov.usuario?.nombre || 'Staff'}: </Text>{nov.mensaje}
+                          </Text>
+                        ))
+                      ) : <Text style={{ fontSize: 12, color: '#999', fontStyle: 'italic' }}>Sin actualizaciones aún.</Text>}
+                    </View>
+
+                    {/* OPERACIONES DE MENSAJERÍA Y CIERRE */}
+                    {!esCerrado && (
+                      <>
+                        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 10}}>
+                          <TextInput style={[styles.input, {flex: 1, marginBottom: 0, height: 45, paddingVertical: 10, fontSize: 13}]} placeholder="Agregar novedad..." value={nuevaNovedad} onChangeText={setNuevaNovedad} />
+                          <TouchableOpacity style={{backgroundColor: '#003366', padding: 10, borderRadius: 10, marginLeft: 5}} onPress={() => enviarNovedad(caso.id)}>
+                            <Ionicons name="send" size={18} color="#FFF" />
+                          </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity style={[styles.btnGuardar, {backgroundColor: '#FF3B30', paddingVertical: 10, marginTop: 5}]} onPress={() => abrirModalCierre(caso.id)}>
+                          <Text style={styles.btnTexto}>Finalizar Caso</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
                   </View>
-                  <Text style={{ fontSize: 12, color: '#666', marginTop: 5 }}>📍 {caso.area_comun ? caso.area_comun : `T${caso.torre_incidente} - Apto ${caso.apartamento_incidente}`}</Text>
-                  {caso.fecha && <Text style={{ fontSize: 11, color: '#888', fontStyle: 'italic' }}>🕒 Registro: {formatearFecha(caso.fecha)}</Text>}
-                  <Text style={{ fontSize: 14, color: '#333', marginTop: 10 }}>{caso.descripcion}</Text>
-                </View>
-              ))}
+                );
+              })}
             </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* MODAL: DIRECTORIO */}
+      {/* --- MODAL 2: FORMULARIO SECUNDARIO DE RESOLUCIÓN Y SANCIONES --- */}
+      <Modal animationType="fade" transparent={true} visible={modalCierre}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#FFF', borderRadius: 20, padding: 25 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#003366', marginBottom: 15 }}>Conclusión del Caso</Text>
+            
+            <Text style={{ fontSize: 13, color: '#666', marginBottom: 5 }}>Resolución o medidas tomadas:</Text>
+            <TextInput 
+              style={[styles.input, { height: 80, textAlignVertical: 'top' }]} 
+              placeholder="Ej: Se habló con el propietario y se comprometió a limpiar el pasillo." 
+              multiline={true} 
+              value={datosCierre.solucion} 
+              onChangeText={(t) => setDatosCierre({...datosCierre, solucion: t})} 
+            />
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 15 }}>
+              <TouchableOpacity 
+                style={{ width: 24, height: 24, borderRadius: 5, borderWidth: 2, borderColor: '#003366', alignItems: 'center', justifyContent: 'center', marginRight: 10, backgroundColor: datosCierre.aplicarLlamado ? '#003366' : '#FFF' }}
+                onPress={() => setDatosCierre({...datosCierre, aplicarLlamado: !datosCierre.aplicarLlamado})}
+              >
+                {datosCierre.aplicarLlamado && <Ionicons name="checkmark" size={18} color="#FFF" />}
+              </TouchableOpacity>
+              <Text style={{ fontSize: 14, color: '#333', fontWeight: 'bold' }}>Aplicar Llamado de Atención</Text>
+            </View>
+
+            {datosCierre.aplicarLlamado && (
+              <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10}}>
+                <TextInput style={[styles.input, {width: '48%'}]} placeholder="Torre (1-20)" keyboardType="numeric" value={datosCierre.torre} onChangeText={(t) => setDatosCierre({...datosCierre, torre: t})} />
+                <TextInput style={[styles.input, {width: '48%'}]} placeholder="Apto (101-1208)" keyboardType="numeric" value={datosCierre.apto} onChangeText={(t) => setDatosCierre({...datosCierre, apto: t})} />
+              </View>
+            )}
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
+              <TouchableOpacity style={{ padding: 15 }} onPress={() => setModalCierre(false)}>
+                <Text style={{ color: '#666', fontWeight: 'bold' }}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ backgroundColor: '#FF3B30', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10 }} onPress={confirmarCierre}>
+                <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Confirmar Cierre</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- MODAL 3: DIRECTORIO COMPLETO DE RESIDENTES --- */}
       <Modal animationType="slide" transparent={true} visible={modalDirectorio}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', paddingTop: 50 }}>
           <View style={{ flex: 1, backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15, alignItems: 'center' }}>
-              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#003366' }}>Residentes</Text>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#003366' }}>Directorio Oficial</Text>
               <TouchableOpacity onPress={() => setModalDirectorio(false)}><Ionicons name="close-circle" size={28} color="#666" /></TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {residentes.length === 0 ? <Text style={{textAlign: 'center', marginTop: 20, color: '#666'}}>Directorio vacío</Text> : null}
+              {residentes.length === 0 ? <Text style={{textAlign: 'center', marginTop: 20, color: '#666'}}>No hay residentes registrados en el sistema</Text> : null}
               {residentes.map((res) => (
                 <View key={res.id} style={{ backgroundColor: '#F8F9FA', padding: 18, borderRadius: 15, marginBottom: 15, borderWidth: 1, borderColor: '#E1E8EE' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
@@ -505,6 +663,8 @@ function InicioAdmin({ usuario }) {
                       <Text style={{ fontSize: 13, color: '#666' }}>Torre {res.torre} - Apto {res.apartamento}</Text>
                     </View>
                   </View>
+                  
+                  {/* Visualización de Métricas de Conducta por Usuario */}
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#FFF', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#EEE' }}>
                     <View style={{ alignItems: 'center', flex: 1 }}>
                       <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#34C759' }}>{res.casos_reportados}</Text>
@@ -513,21 +673,22 @@ function InicioAdmin({ usuario }) {
                     <View style={{ width: 1, backgroundColor: '#EEE' }} />
                     <View style={{ alignItems: 'center', flex: 1 }}>
                       <Text style={{ fontSize: 16, fontWeight: 'bold', color: res.quejas_recibidas > 0 ? '#FF3B30' : '#666' }}>{res.quejas_recibidas}</Text>
-                      <Text style={{ fontSize: 11, color: '#666', textAlign: 'center' }}>Quejas en contra</Text>
+                      <Text style={{ fontSize: 11, color: '#666', textAlign: 'center' }}>Llamados Recibidos</Text>
                     </View>
                   </View>
-                  <Text style={{ fontSize: 12, color: '#888', marginTop: 10, textAlign: 'center' }}>📞 {res.celular}</Text>
+                  <Text style={{ fontSize: 12, color: '#888', marginTop: 10, textAlign: 'center' }}>📞 Teléfono: {res.celular}</Text>
                 </View>
               ))}
             </ScrollView>
           </View>
         </View>
       </Modal>
+
     </View>
   );
 }
 
-// --- 2. DIRECTOR DE TRÁFICO ---
+// --- 4. DIRECTOR DE TRÁFICO ---
 function PantallaPrincipal({ usuario }) {
   // Evitamos el crash asegurándonos de que si el usuario no ha cargado, no intente leer .rol
   if (!usuario) return null; 
@@ -543,28 +704,46 @@ function PantallaPrincipal({ usuario }) {
   }
 }
 
-// --- 2. PANTALLA PERFIL ---
+// --- 5. PANTALLA PERFIL (ACTUALIZACIÓN EN TIEMPO REAL) ---
 function PantallaPerfil({ usuario, setUsuario }) {
   const rol = usuario.rol ? usuario.rol.toUpperCase() : 'RESIDENTE';
   const [modalQuejasVisible, setModalQuejasVisible] = useState(false);
-  const [llamados, setLlamados] = useState([]); // Estado para llamados reales
-  const [modalVisible, setModalVisible] = useState(false); // Modal de contraseña
+  const [llamados, setLlamados] = useState([]); 
+  const [errorLlamados, setErrorLlamados] = useState(false); 
+  const [modalVisible, setModalVisible] = useState(false); 
   const [passwords, setPasswords] = useState({ actual: '', nueva: '', confirmar: '' });
   
   const IP_COMPUTADORA = '192.168.1.44';
 
-  // Obtener los llamados de atención reales de este residente
-  const cargarLlamadosAtencion = async () => {
+  // Función encargada de sincronizar los llamados con la base de datos de Laravel
+  const consultarLlamadosAtencion = async () => {
     try {
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/usuarios/${usuario.id}/llamados`);
-      if (!respuesta.ok) throw new Error('Error al obtener llamados');
       
-      const datos = await respuesta.json();
-      setLlamados(datos);
-      setModalQuejasVisible(true);
+      if (!respuesta.ok) {
+        setErrorLlamados(true); 
+      } else {
+        const datos = await respuesta.json();
+        setLlamados(datos);
+        setErrorLlamados(false); 
+      }
     } catch (error) {
-      Alert.alert('Error', 'No se pudieron cargar tus llamados de atención.');
-    }
+      setErrorLlamados(true); 
+    } 
+  };
+
+  // EFECTO EN TIEMPO REAL: Cada vez que la pestaña Perfil se enfoca, actualiza los llamados
+  useFocusEffect(
+    useCallback(() => {
+      if (rol === 'RESIDENTE') {
+        consultarLlamadosAtencion();
+      }
+    }, [])
+  );
+
+  // El botón ahora simplemente abre el modal de forma instantánea porque los datos ya están precargados
+  const abrirModalLlamados = () => {
+    setModalQuejasVisible(true);
   };
 
   // Enviar cambio de contraseña real a Laravel
@@ -579,14 +758,11 @@ function PantallaPerfil({ usuario, setUsuario }) {
     try {
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/usuarios/${usuario.id}/cambiar-password`, {
         method: 'POST',
-        headers: { 
-          'Accept': 'application/json', 
-          'Content-Type': 'application/json' 
-        },
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({
           password_actual: passwords.actual,
           password_nueva: passwords.nueva,
-          password_nueva_confirmation: passwords.confirmar // Convención típica de Laravel
+          password_nueva_confirmation: passwords.confirmar 
         })
       });
 
@@ -620,7 +796,7 @@ function PantallaPerfil({ usuario, setUsuario }) {
           {/* BOTÓN LLAMADOS DE ATENCIÓN */}
           {rol === 'RESIDENTE' && (
             <>
-              <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={cargarLlamadosAtencion}>
+              <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={abrirModalLlamados}>
                 <View style={styles.profileOptionIconContainer}><Ionicons name="warning" size={24} color="#00264D" /></View>
                 <View style={styles.actionTextGroup}>
                   <Text style={styles.profileOptionTitle}>Llamados de Atención</Text>
@@ -653,7 +829,7 @@ function PantallaPerfil({ usuario, setUsuario }) {
         </View>
       </ScrollView>
 
-      {/* --- MODAL: LLAMADOS DE ATENCIÓN (CON DATOS DE LARAVEL) --- */}
+      {/* --- MODAL: LLAMADOS DE ATENCIÓN --- */}
       <Modal animationType="slide" transparent={true} visible={modalQuejasVisible}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', paddingTop: 100 }}>
           <View style={{ flex: 1, backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 25 }}>
@@ -663,16 +839,29 @@ function PantallaPerfil({ usuario, setUsuario }) {
             </View>
             
             <ScrollView showsVerticalScrollIndicator={false}>
-              {llamados.length === 0 ? <Text style={{textAlign: 'center', marginTop: 20, color: '#666'}}>No tienes llamados de atención registrados. ¡Buen comportamiento! 🎉</Text> : null}
-              {llamados.map((queja) => (
-                <View key={queja.id} style={{ backgroundColor: '#F2F6FA', padding: 18, borderRadius: 15, marginBottom: 15, borderLeftWidth: 5, borderLeftColor: '#003366' }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                    <Text style={{ fontWeight: 'bold', color: '#003366' }}>{queja.fecha}</Text>
-                    <Text style={{ fontWeight: 'bold', color: '#FF3B30', fontSize: 12 }}>{queja.estado?.toUpperCase()}</Text>
-                  </View>
-                  <Text style={{ fontSize: 15, color: '#333' }}>{queja.motivo}</Text>
+              {errorLlamados ? (
+                <View style={{ alignItems: 'center', marginTop: 30 }}>
+                  <Ionicons name="cloud-offline" size={50} color="#FF3B30" />
+                  <Text style={{textAlign: 'center', marginTop: 10, color: '#FF3B30', fontWeight: 'bold'}}>No se pudo conectar al servidor.</Text>
+                  <Text style={{textAlign: 'center', marginTop: 5, color: '#666', fontSize: 13}}>No pudimos verificar tus llamados de atención en este momento.</Text>
                 </View>
-              ))}
+              ) : llamados.length === 0 ? (
+                <View style={{ alignItems: 'center', marginTop: 30 }}>
+                  <Text style={{fontSize: 40}}>🎉</Text>
+                  <Text style={{textAlign: 'center', marginTop: 15, color: '#003366', fontWeight: 'bold', fontSize: 16}}>¡Buen comportamiento!</Text>
+                  <Text style={{textAlign: 'center', marginTop: 5, color: '#666', fontSize: 14}}>No tienes llamados de atención registrados en tu apartamento.</Text>
+                </View>
+              ) : (
+                llamados.map((queja) => (
+                  <View key={queja.id} style={{ backgroundColor: '#F2F6FA', padding: 18, borderRadius: 15, marginBottom: 15, borderLeftWidth: 5, borderLeftColor: '#003366' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <Text style={{ fontWeight: 'bold', color: '#003366' }}>{queja.fecha}</Text>
+                      <Text style={{ fontWeight: 'bold', color: '#FF3B30', fontSize: 12 }}>{queja.estado?.toUpperCase()}</Text>
+                    </View>
+                    <Text style={{ fontSize: 15, color: '#333' }}>{queja.motivo}</Text>
+                  </View>
+                ))
+              )}
             </ScrollView>
           </View>
         </View>
@@ -703,7 +892,7 @@ function PantallaPerfil({ usuario, setUsuario }) {
   );
 }
 
-// --- 4. MURO DE AUTENTICACIÓN ---
+// --- 6. MURO DE AUTENTICACIÓN ---
 function PantallaAuth({ setUsuario }) {
   const [esRegistro, setEsRegistro] = useState(false); 
   const [datos, setDatos] = useState({ nombre: '', apellidos: '', correo: '', celular: '', torre: '', apartamento: '', cedula: '', password: '', rol: 'residente' });
@@ -727,7 +916,6 @@ function PantallaAuth({ setUsuario }) {
 
   return (
     <ScrollView 
-      // AQUÍ ESTÁ LA SOLUCIÓN: Agregamos mucho más espacio abajo cuando es registro
       contentContainerStyle={[styles.authContainer, { paddingBottom: esRegistro ? 150 : 80 }]} 
       showsVerticalScrollIndicator={false}
     >
@@ -784,7 +972,7 @@ function PantallaAuth({ setUsuario }) {
   );
 }
 
-// --- 5. CONFIGURACIÓN PRINCIPAL ---
+// --- 7. CONFIGURACIÓN PRINCIPAL ---
 const Tab = createMaterialTopTabNavigator();
 
 export default function App() {
@@ -828,36 +1016,104 @@ export default function App() {
   );
 }
 
-// --- 5. PANTALLA INFORMES SEMANALES (GRÁFICOS) ---
+// --- 8. PANTALLA INFORMES SEMANALES (GRÁFICOS E INSIGHTS DINÁMICOS) ---
 function PantallaInformes() {
   const [filtroActivo, setFiltroActivo] = useState('Categorias');
-  const screenWidth = Dimensions.get('window').width - 80; // Ajuste para los márgenes
+  const screenWidth = Dimensions.get('window').width - 80; 
 
-  // --- DATOS SIMULADOS PARA LOS GRÁFICOS ---
-  const datosPastel = [
-    { name: 'Seguridad', poblacion: 45, color: '#FF3B30', legendFontColor: '#333', legendFontSize: 12 },
-    { name: 'Daños', poblacion: 30, color: '#FF9500', legendFontColor: '#333', legendFontSize: 12 },
-    { name: 'Convivencia', poblacion: 25, color: '#34C759', legendFontColor: '#333', legendFontSize: 12 },
-  ];
+  const [datosPastel, setDatosPastel] = useState([]);
+  const [datosBarrasTorres, setDatosBarrasTorres] = useState({ labels: ['Cargando...'], datasets: [{ data: [0] }] });
+  const [datosBarrasGuardias, setDatosBarrasGuardias] = useState({ labels: ['Cargando...'], datasets: [{ data: [0] }] });
+  
+  const [analisis, setAnalisis] = useState({
+    categoriaTop: 'Sin datos',
+    torreTop: 'Sin datos',
+    guardiaTop: 'Sin datos'
+  });
 
-  const datosBarrasTorres = {
-    labels: ['Torre 1', 'Torre 2', 'Torre 3', 'Torre 4'],
-    datasets: [{ data: [12, 5, 8, 2] }]
+  const IP_COMPUTADORA = '192.168.1.44';
+
+  const cargarMetricas = async () => {
+    try {
+      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/metricas`);
+      if (!respuesta.ok) throw new Error('Error al obtener métricas');
+      const data = await respuesta.json();
+
+      let catTop = 'Sin datos';
+      const colores = ['#00264D', '#FF9500', '#34C759', '#007AFF', '#AF52DE'];
+      
+      // Procesar Categorías
+      if (data.categorias && data.categorias.length > 0) {
+        const pastelFormateado = data.categorias.map((item, index) => ({
+          name: item.name,
+          poblacion: item.poblacion,
+          color: colores[index % colores.length],
+          legendFontColor: '#333',
+          legendFontSize: 12
+        }));
+        setDatosPastel(pastelFormateado);
+        
+        const maxCat = data.categorias.reduce((prev, current) => (prev.poblacion > current.poblacion) ? prev : current);
+        catTop = maxCat.name;
+      } else {
+        setDatosPastel([]);
+      }
+
+      // Procesar Torres
+      let torTop = 'Sin datos';
+      if (data.torres && data.torres.length > 0) {
+        setDatosBarrasTorres({
+          labels: data.torres.map(t => `T${t.torre_incidente}`),
+          datasets: [{ data: data.torres.map(t => t.total) }]
+        });
+        
+        const maxTorre = data.torres.reduce((prev, current) => (prev.total > current.total) ? prev : current);
+        torTop = `Torre ${maxTorre.torre_incidente}`;
+      } else {
+        setDatosBarrasTorres({ labels: ['Sin datos'], datasets: [{ data: [0] }] });
+      }
+
+      // Procesar Guardias
+      let guarTop = 'Sin datos';
+      if (data.guardias && data.guardias.length > 0) {
+        setDatosBarrasGuardias({
+          labels: data.guardias.map(g => g.etiqueta.split(' ')[0]), 
+          datasets: [{ data: data.guardias.map(g => g.total) }]
+        });
+        
+        const maxGuar = data.guardias.reduce((prev, current) => (prev.total > current.total) ? prev : current);
+        guarTop = maxGuar.etiqueta.split(' ')[0];
+      } else {
+        setDatosBarrasGuardias({ labels: ['Sin datos'], datasets: [{ data: [0] }] });
+      }
+
+      setAnalisis({ categoriaTop: catTop, torreTop: torTop, guardiaTop: guarTop });
+
+    } catch (error) {
+      console.log('Error cargando métricas:', error);
+    }
   };
 
-  const datosBarrasGuardias = {
-    labels: ['Aemy', 'Carlos', 'Luis'],
-    datasets: [{ data: [15, 9, 4] }]
-  };
+  // REFRESCAR AL ENTRAR A LA PESTAÑA (useFocusEffect)
+  useFocusEffect(
+    React.useCallback(() => {
+      cargarMetricas();
+    }, [])
+  );
 
   const chartConfig = {
     backgroundColor: '#FFF',
     backgroundGradientFrom: '#FFF',
     backgroundGradientTo: '#FFF',
-    color: (opacity = 1) => `rgba(0, 38, 77, ${opacity})`, // Azul premium
+    color: (opacity = 1) => `rgba(0, 38, 77, ${opacity})`, 
     labelColor: (opacity = 1) => `rgba(102, 119, 136, ${opacity})`,
     barPercentage: 0.6,
     decimalPlaces: 0,
+    fillShadowGradient: '#00264D',           
+    fillShadowGradientOpacity: 1,            
+    fillShadowGradientFrom: '#00264D',       
+    fillShadowGradientTo: '#00264D',         
+    fillShadowGradientToOpacity: 1,          
   };
 
   return (
@@ -875,7 +1131,6 @@ function PantallaInformes() {
 
       <ScrollView contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
         
-        {/* FILTROS (Botones tipo pastilla) */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
           {['Categorias', 'Torres', 'Guardias'].map((filtro) => (
             <TouchableOpacity 
@@ -888,43 +1143,54 @@ function PantallaInformes() {
           ))}
         </ScrollView>
 
-        {/* CONTENEDOR DEL GRÁFICO */}
         <View style={styles.actionBlock}>
           <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#00264D', marginBottom: 15, paddingHorizontal: 20, paddingTop: 20 }}>
-            {filtroActivo === 'Categorias' && 'Distribución por Categoría (%)'}
-            {filtroActivo === 'Torres' && 'Torres con más Infracciones/Daños'}
+            {filtroActivo === 'Categorias' && 'Distribución por Categoría'}
+            {filtroActivo === 'Torres' && 'Torres con más Infracciones'}
             {filtroActivo === 'Guardias' && 'Casos Resueltos por Guardia'}
           </Text>
 
           <View style={{ alignItems: 'center', paddingBottom: 20 }}>
             {filtroActivo === 'Categorias' ? (
-              <PieChart
-                data={datosPastel}
-                width={screenWidth + 40}
-                height={200}
-                chartConfig={chartConfig}
-                accessor={"poblacion"}
-                backgroundColor={"transparent"}
-                paddingLeft={"10"}
-                absolute // Muestra el número en lugar del %
-              />
+              datosPastel.length > 0 ? (
+                <PieChart
+                  data={datosPastel}
+                  width={screenWidth + 40}
+                  height={200}
+                  chartConfig={chartConfig}
+                  accessor={"poblacion"}
+                  backgroundColor={"transparent"}
+                  paddingLeft={"10"}
+                  absolute 
+                />
+              ) : <Text style={{color: '#666', padding: 40, fontStyle: 'italic'}}>No hay datos registrados al momento 📊</Text>
             ) : (
-              <BarChart
-                data={filtroActivo === 'Torres' ? datosBarrasTorres : datosBarrasGuardias}
-                width={screenWidth}
-                height={220}
-                chartConfig={chartConfig}
-                verticalLabelRotation={0}
-                showValuesOnTopOfBars={true}
-                fromZero={true}
-                style={{ borderRadius: 16 }}
-              />
+              (filtroActivo === 'Torres' ? datosBarrasTorres : datosBarrasGuardias).labels[0] === 'Sin datos' ? (
+                <Text style={{color: '#666', padding: 40, fontStyle: 'italic'}}>No hay datos registrados al momento 📊</Text>
+              ) : (
+                <BarChart
+                  data={filtroActivo === 'Torres' ? datosBarrasTorres : datosBarrasGuardias}
+                  width={screenWidth}
+                  height={220}
+                  chartConfig={chartConfig}
+                  verticalLabelRotation={0}
+                  showValuesOnTopOfBars={true}
+                  fromZero={true}
+                  style={{ borderRadius: 16 }}
+                />
+              )
             )}
           </View>
         </View>
 
-        <View style={{ backgroundColor: '#E5F9E7', padding: 15, borderRadius: 15, marginTop: 20, borderWidth: 1, borderColor: '#C8E6C9' }}>
-          <Text style={{ color: '#00264D', fontSize: 13 }}>💡 <Text style={{fontWeight: 'bold'}}>Análisis rápido:</Text> La Torre 1 presenta el mayor índice de reportes esta semana. Se sugiere aumentar las rondas de vigilancia en esa zona.</Text>
+        {/* CAJA DE ANÁLISIS DINÁMICO REVISADA CONTRA STRINGS EN BLANCO */}
+        <View style={{ backgroundColor: '#E5F9E7', padding: 18, borderRadius: 15, marginTop: 20, borderWidth: 1, borderColor: '#C8E6C9' }}>
+          <Text style={{ color: '#00264D', fontSize: 14, lineHeight: 22 }}>
+            💡 <Text style={{fontWeight: 'bold'}}>Análisis rápido:</Text>{'\n'}
+            {filtroActivo === 'Categorias' && (analisis.categoriaTop === 'Sin datos' ? 'No hay datos disponibles al momento para generar un análisis.' : `Actualmente, la categoría con mayor volumen de alertas es "${analisis.categoriaTop}". Se recomienda revisar los protocolos de esta área.`)}
+            {filtroActivo === 'Torres' && (analisis.torreTop === 'Sin datos' ? 'No hay registros de incidentes por torres al momento.' : `La ${analisis.torreTop} presenta la mayor concentración de incidentes. Sería prudente aumentar las rondas de vigilancia en este sector.`)}
+            {filtroActivo === 'Guardias' && (analisis.guardiaTop === 'Sin datos' ? 'No hay registros de actividad de guardias al momento.' : `El guardia ${analisis.guardiaTop} lidera la atención de casos en el sistema. Excelente tiempo de respuesta y gestión.`)}
+          </Text>
         </View>
 
       </ScrollView>
@@ -932,15 +1198,56 @@ function PantallaInformes() {
   );
 }
 
-// --- 6. PANTALLA HISTÓRICO (TABLA ORGANIZADA) ---
+// --- 9. PANTALLA HISTÓRICO ---
 function PantallaHistorico() {
-  const casosConfirmados = [
-    { id: '1024', fecha: '11/05/26', caso: 'Ruido excesivo', ubicacion: 'T1-101', estado: 'Resuelto' },
-    { id: '1023', fecha: '09/05/26', caso: 'Fuga piscina', ubicacion: 'Área Común', estado: 'Resuelto' },
-    { id: '1022', fecha: '05/05/26', caso: 'Mascota suelta', ubicacion: 'T2-305', estado: 'Multa' },
-    { id: '1021', fecha: '02/05/26', caso: 'Lámpara rota', ubicacion: 'Parqueadero', estado: 'Resuelto' },
-    { id: '1020', fecha: '28/04/26', caso: 'Basura pasillo', ubicacion: 'T1-204', estado: 'Aviso' },
-  ];
+  const [casosConfirmados, setCasosConfirmados] = useState([]);
+  
+  // ESTADOS PARA LOS FILTROS
+  const [filtroFecha, setFiltroFecha] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('Todos'); 
+
+  const IP_COMPUTADORA = '192.168.1.44';
+
+  const cargarHistoricoGlobal = async () => {
+    try {
+      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/todos`);
+      if (!respuesta.ok) throw new Error('Error al obtener el historial');
+
+      const datos = await respuesta.json();
+      
+      const datosFormateados = datos.map(item => {
+        const fechaCorta = item.fecha ? item.fecha.split(' ')[0] : 'S/F';
+        return {
+          id: item.id.toString(),
+          fecha: fechaCorta,
+          caso: item.titulo,
+          ubicacion: item.area_comun ? item.area_comun : `T${item.torre_incidente}-Apto ${item.apartamento_incidente}`,
+          estado: item.estado || 'Abierto'
+        };
+      });
+
+      setCasosConfirmados(datosFormateados);
+    } catch (error) {
+      console.log('Error cargando el histórico global:', error);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      cargarHistoricoGlobal();
+    }, [])
+  );
+
+  // LÓGICA DE FILTRADO EN TIEMPO REAL
+  const casosFiltrados = casosConfirmados.filter((item) => {
+    // 1. Filtro por Fecha (Coincidencia parcial de texto)
+    const cumpleFecha = filtroFecha === '' || item.fecha.includes(filtroFecha);
+    
+    // 2. Filtro por Estado
+    const cumpleEstado = filtroEstado === 'Todos' || item.estado.toLowerCase() === filtroEstado.toLowerCase();
+
+    return cumpleFecha && cumpleEstado;
+  });
 
   return (
     <View style={styles.mainContainer}>
@@ -957,32 +1264,112 @@ function PantallaHistorico() {
 
       <ScrollView contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
         
+        {/* --- PANEL DE FILTROS REDISEÑADO --- */}
+        <View style={{ backgroundColor: '#FFFFFF', padding: 18, borderRadius: 20, marginBottom: 20, shadowColor: '#003366', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 }}>
+          
+          <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#00264D', marginBottom: 12 }}>Filtros de Búsqueda</Text>
+
+          {/* Barra de búsqueda de fecha estilizada */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FB', borderWidth: 1, borderColor: '#E1E8EE', borderRadius: 12, paddingHorizontal: 12, height: 45, marginBottom: 15 }}>
+            <Ionicons name="search" size={20} color="#888" style={{ marginRight: 8 }} />
+            <TextInput 
+              style={{ flex: 1, fontSize: 14, color: '#333' }} 
+              placeholder="Buscar por fecha (Ej. 2026-06-15)" 
+              placeholderTextColor="#999"
+              value={filtroFecha} 
+              onChangeText={setFiltroFecha} 
+              keyboardType="numeric"
+            />
+            {filtroFecha !== '' && (
+              <TouchableOpacity onPress={() => setFiltroFecha('')} style={{ padding: 4 }}>
+                <Ionicons name="close-circle" size={20} color="#CCC" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Botones de Estado tipo pastilla con flexWrap para evitar recortes */}
+          <Text style={{ fontSize: 12, color: '#666', marginBottom: 8, marginLeft: 2 }}>Estado del caso:</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            {['Todos', 'Abierto', 'En Proceso', 'Resuelto'].map((estado) => (
+              <TouchableOpacity 
+                key={estado} 
+                style={[
+                  styles.filterBtn, 
+                  { 
+                    height: 38, // Altura optimizada para evitar recortes
+                    justifyContent: 'center', // Centrado vertical estricto
+                    alignItems: 'center',
+                    paddingHorizontal: 16, 
+                    borderRadius: 10, 
+                    marginRight: 8, 
+                    marginBottom: 8, 
+                    borderWidth: 1, 
+                    borderColor: filtroEstado === estado ? '#00264D' : 'transparent' 
+                  }, 
+                  filtroEstado === estado ? { backgroundColor: '#00264D' } : { backgroundColor: '#F2F6FA' }
+                ]}
+                onPress={() => setFiltroEstado(estado)}
+              >
+                <Text style={[
+                  styles.filterText, 
+                  { fontSize: 13, marginTop: -2 }, // Ajuste fino para la fuente en Android
+                  filtroEstado === estado ? { color: '#FFFFFF' } : { color: '#667788' }
+                ]}>
+                  {estado}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* --- TABLA DE RESULTADOS RESTRUCTURADA --- */}
         <View style={[styles.actionBlock, { padding: 0, overflow: 'hidden' }]}>
           
           {/* CABECERA DE LA TABLA */}
           <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderText, { flex: 0.8 }]}>Fecha</Text>
-            <Text style={[styles.tableHeaderText, { flex: 1.5 }]}>Incidente</Text>
-            <Text style={[styles.tableHeaderText, { flex: 1 }]}>Lugar</Text>
-            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right' }]}>Cierre</Text>
+            <Text style={[styles.tableHeaderText, { flex: 1.1, paddingRight: 5 }]}>Fecha</Text>
+            <Text style={[styles.tableHeaderText, { flex: 1.5, paddingRight: 5 }]}>Incidente</Text>
+            <Text style={[styles.tableHeaderText, { flex: 1, paddingRight: 5 }]}>Lugar</Text>
+            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right' }]}>Estado</Text>
           </View>
 
           {/* FILAS DE LA TABLA */}
-          {casosConfirmados.map((item, index) => (
-            <View key={item.id} style={[styles.tableRow, index % 2 === 0 ? { backgroundColor: '#FFFFFF' } : { backgroundColor: '#F8F9FB' }]}>
-              <Text style={[styles.tableCell, { flex: 0.8, fontSize: 11 }]}>{item.fecha}</Text>
-              <Text style={[styles.tableCell, { flex: 1.5, fontWeight: 'bold', color: '#00264D' }]} numberOfLines={1}>{item.caso}</Text>
-              <Text style={[styles.tableCell, { flex: 1 }]}>{item.ubicacion}</Text>
-              <Text style={[styles.tableCell, { 
-                flex: 1, 
-                textAlign: 'right', 
-                fontWeight: 'bold',
-                color: item.estado === 'Resuelto' ? '#34C759' : item.estado === 'Multa' ? '#FF3B30' : '#FF9500' 
-              }]}>
-                {item.estado}
+          {casosFiltrados.length === 0 ? (
+            <View style={{ alignItems: 'center', padding: 30 }}>
+              <Ionicons name="folder-open-outline" size={40} color="#CCC" />
+              <Text style={{ textAlign: 'center', marginTop: 10, color: '#666', fontSize: 14 }}>
+                No se encontraron registros.
               </Text>
             </View>
-          ))}
+          ) : (
+            casosFiltrados.map((item, index) => (
+              <View key={item.id} style={[styles.tableRow, index % 2 === 0 ? { backgroundColor: '#FFFFFF' } : { backgroundColor: '#F8F9FB' }]}>
+                
+                <Text style={[styles.tableCell, { flex: 1.1, fontSize: 12, paddingRight: 5 }]} numberOfLines={1}>
+                  {item.fecha}
+                </Text>
+                
+                <Text style={[styles.tableCell, { flex: 1.5, fontWeight: 'bold', color: '#00264D', paddingRight: 5 }]} numberOfLines={1}>
+                  {item.caso}
+                </Text>
+                
+                <Text style={[styles.tableCell, { flex: 1, paddingRight: 5 }]} numberOfLines={1}>
+                  {item.ubicacion}
+                </Text>
+                
+                <Text style={[styles.tableCell, { 
+                  flex: 1, 
+                  textAlign: 'right', 
+                  fontWeight: 'bold',
+                  fontSize: 11,
+                  color: item.estado === 'Resuelto' || item.estado === 'Terminado' ? '#34C759' : item.estado === 'Multa' ? '#FF3B30' : '#FF9500' 
+                }]} numberOfLines={1}>
+                  {item.estado.toUpperCase()}
+                </Text>
+                
+              </View>
+            ))
+          )}
 
         </View>
 
@@ -991,7 +1378,7 @@ function PantallaHistorico() {
   );
 }
 
-// --- 6. ESTILOS COMPLETOS ---
+// --- 10. ESTILOS COMPLETOS ---
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
@@ -1023,12 +1410,10 @@ const styles = StyleSheet.create({
   },
   bodyContent: {
     paddingHorizontal: 20,
-    paddingBottom: 60, // Espacio al final
+    paddingBottom: 60, 
   },
-  
-  // ESTOS SON LOS ESTILOS QUE ARREGLAN EL PERFIL ROTO
   actionBlock: {
-    backgroundColor: '#FFFFFF', // El fondo blanco que se había perdido
+    backgroundColor: '#FFFFFF', 
     borderRadius: 20,
     shadowColor: '#003366',
     shadowOffset: { width: 0, height: 6 },
@@ -1052,7 +1437,7 @@ const styles = StyleSheet.create({
     marginRight: 15,
   },
   actionTextGroup: {
-    flex: 1, // Esto obliga al texto a no esconderse
+    flex: 1, 
   },
   profileOptionTitle: {
     fontSize: 16,
@@ -1085,8 +1470,6 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
   },
-
-  // ESTILOS DE LOGIN
   authContainer: {
     flexGrow: 1,
     backgroundColor: '#F3F6F9',
@@ -1170,7 +1553,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   btnTexto: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-  // --- ESTILOS DE FILTROS (INFORMES) ---
   filterBtn: {
     backgroundColor: '#E6F0FA',
     paddingHorizontal: 20,
@@ -1191,8 +1573,6 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: '#FFFFFF',
   },
-
-  // --- ESTILOS DE LA TABLA (HISTÓRICO) ---
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: '#00264D',
