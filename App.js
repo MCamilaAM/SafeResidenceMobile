@@ -16,7 +16,7 @@ function InicioResidente({ usuario }) {
   const enviarReporte = async () => {
     if (!reporte.titulo || !reporte.descripcion) return Alert.alert('Atención', 'Llena título y descripción.');
     try {
-      const IP_COMPUTADORA = '192.168.1.44'; 
+      const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app'; 
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportar`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
@@ -45,7 +45,7 @@ function InicioResidente({ usuario }) {
   const cargarMisReportes = async () => {
     if (!usuario?.id) return;
     try {
-      const IP_COMPUTADORA = '192.168.1.44'; 
+      const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app'; 
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/residente/${usuario.id}`);
       if (!respuesta.ok) throw new Error('Error del servidor');
       const datos = await respuesta.json();
@@ -199,7 +199,7 @@ function InicioVigilante({ usuario }) {
   // NUEVO ESTADO para enviar novedades
   const [nuevaNovedad, setNuevaNovedad] = useState('');
 
-  const IP_COMPUTADORA = '192.168.1.44';
+  const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app';
 
   const cargarCasosActivos = async () => {
     try {
@@ -396,7 +396,7 @@ function InicioAdmin({ usuario }) {
   const [modalCierre, setModalCierre] = useState(false);
   const [datosCierre, setDatosCierre] = useState({ idReporte: null, solucion: '', aplicarLlamado: false, torre: '', apto: '' });
 
-  const IP_COMPUTADORA = '192.168.1.44';
+  const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app';
 
   const cargarTodosLosCasos = async () => {
     try {
@@ -713,7 +713,7 @@ function PantallaPerfil({ usuario, setUsuario }) {
   const [modalVisible, setModalVisible] = useState(false); 
   const [passwords, setPasswords] = useState({ actual: '', nueva: '', confirmar: '' });
   
-  const IP_COMPUTADORA = '192.168.1.44';
+  const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app';
 
   // Función encargada de sincronizar los llamados con la base de datos de Laravel
   const consultarLlamadosAtencion = async () => {
@@ -899,7 +899,7 @@ function PantallaAuth({ setUsuario }) {
 
   const procesarFormulario = async () => {
     try {
-      const IP_COMPUTADORA = '192.168.1.44'; 
+      const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app'; 
       const endpoint = esRegistro ? '/api/registro' : '/api/login';
       const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000${endpoint}`, {
         method: 'POST',
@@ -1031,7 +1031,7 @@ function PantallaInformes() {
     guardiaTop: 'Sin datos'
   });
 
-  const IP_COMPUTADORA = '192.168.1.44';
+  const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app';
 
   const cargarMetricas = async () => {
     try {
@@ -1206,7 +1206,7 @@ function PantallaHistorico() {
   const [filtroFecha, setFiltroFecha] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('Todos'); 
 
-  const IP_COMPUTADORA = '192.168.1.44';
+  const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app';
 
   const cargarHistoricoGlobal = async () => {
     try {
