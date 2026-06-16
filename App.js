@@ -46,7 +46,7 @@ function InicioResidente({ usuario }) {
     if (!usuario?.id) return;
     try {
       const DOMINIO = 'https://saferesidenceapp-production.up.railway.app'; 
-      const respuesta = await fetch(`http://${DOMINIO}:8000/api/reportes/residente/${usuario.id}`);
+      const respuesta = await fetch(`${DOMINIO}/api/reportes/residente/${usuario.id}`);
       if (!respuesta.ok) throw new Error('Error del servidor');
       const datos = await respuesta.json();
       setMisReportes(datos);
@@ -203,7 +203,7 @@ function InicioVigilante({ usuario }) {
 
   const cargarCasosActivos = async () => {
     try {
-      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/activos`);
+      const respuesta = await fetch(`${DOMINIO}/api/reportes/activos`);
       if (!respuesta.ok) throw new Error('Error de servidor');
       const datos = await respuesta.json();
       setCasos(datos);
@@ -215,7 +215,7 @@ function InicioVigilante({ usuario }) {
 
   const cargarMisCasos = async () => {
     try {
-      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/vigilante/${usuario?.id}`);
+      const respuesta = await fetch(`${DOMINIO}/api/reportes/vigilante/${usuario?.id}`);
       if (!respuesta.ok) throw new Error('Error de servidor');
       const datos = await respuesta.json();
       setMisCasos(datos);
@@ -228,7 +228,7 @@ function InicioVigilante({ usuario }) {
   const tomarCaso = async (idReporte) => {
     if (!usuario?.id) return Alert.alert('Error', 'No se pudo identificar las credenciales.');
     try {
-      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/${idReporte}/tomar`, {
+      const respuesta = await fetch(`${DOMINIO}/api/reportes/${idReporte}/tomar`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ vigilante_id: usuario.id })
@@ -248,7 +248,7 @@ function InicioVigilante({ usuario }) {
   const enviarNovedad = async (idReporte) => {
     if (!nuevaNovedad) return Alert.alert('Atención', 'Escribe una novedad primero.');
     try {
-      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/${idReporte}/novedad`, {
+      const respuesta = await fetch(`${DOMINIO}/api/reportes/${idReporte}/novedad`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: usuario.id, mensaje: nuevaNovedad })
@@ -400,7 +400,7 @@ function InicioAdmin({ usuario }) {
 
   const cargarTodosLosCasos = async () => {
     try {
-      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/todos`);
+      const respuesta = await fetch(`${DOMINIO}/api/reportes/todos`);
       if (!respuesta.ok) throw new Error('Error al obtener los casos');
 
       let datos = await respuesta.json();
@@ -434,7 +434,7 @@ function InicioAdmin({ usuario }) {
     }
 
     try {
-      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/${datosCierre.idReporte}/cerrar`, {
+      const respuesta = await fetch(`${DOMINIO}/api/reportes/${datosCierre.idReporte}/cerrar`, {
         method: 'PUT',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -463,7 +463,7 @@ function InicioAdmin({ usuario }) {
   const enviarNovedad = async (idReporte) => {
     if (!nuevaNovedad) return Alert.alert('Atención', 'Escribe una novedad primero.');
     try {
-      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/${idReporte}/novedad`, {
+      const respuesta = await fetch(`${DOMINIO}/api/reportes/${idReporte}/novedad`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: usuario.id, mensaje: nuevaNovedad })
@@ -480,7 +480,7 @@ function InicioAdmin({ usuario }) {
   // Carga el Directorio de usuarios desde la base de datos
   const cargarDirectorio = async () => {
     try {
-      const respuesta = await fetch(`http://${DOMINIO}/api/directorio`);
+      const respuesta = await fetch(`${DOMINIO}/api/directorio`);
       if (!respuesta.ok) throw new Error('Error al obtener el directorio');
 
       const datos = await respuesta.json();
@@ -718,7 +718,7 @@ function PantallaPerfil({ usuario, setUsuario }) {
   // Función encargada de sincronizar los llamados con la base de datos de Laravel
   const consultarLlamadosAtencion = async () => {
     try {
-      const respuesta = await fetch(`http://${DOMINIO}/api/usuarios/${usuario.id}/llamados`);
+      const respuesta = await fetch(`${DOMINIO}/api/usuarios/${usuario.id}/llamados`);
       
       if (!respuesta.ok) {
         setErrorLlamados(true); 
@@ -756,7 +756,7 @@ function PantallaPerfil({ usuario, setUsuario }) {
     }
 
     try {
-      const respuesta = await fetch(`http://${DOMINIO}/api/usuarios/${usuario.id}/cambiar-password`, {
+      const respuesta = await fetch(`${DOMINIO}/api/usuarios/${usuario.id}/cambiar-password`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -901,7 +901,7 @@ function PantallaAuth({ setUsuario }) {
     try {
       const DOMINIO = 'https://saferesidenceapp-production.up.railway.app'; 
       const endpoint = esRegistro ? '/api/registro' : '/api/login';
-      const respuesta = await fetch(`http://${DOMINIO}${endpoint}`, {
+      const respuesta = await fetch(`${DOMINIO}${endpoint}`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify(datos)
@@ -1035,7 +1035,7 @@ function PantallaInformes() {
 
   const cargarMetricas = async () => {
     try {
-      const respuesta = await fetch(`http://${DOMINIO}/api/metricas`);
+      const respuesta = await fetch(`${DOMINIO}/api/metricas`);
       if (!respuesta.ok) throw new Error('Error al obtener métricas');
       const data = await respuesta.json();
 
@@ -1210,7 +1210,7 @@ function PantallaHistorico() {
 
   const cargarHistoricoGlobal = async () => {
     try {
-      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/todos`);
+      const respuesta = await fetch(`${DOMINIO}/api/reportes/todos`);
       if (!respuesta.ok) throw new Error('Error al obtener el historial');
 
       const datos = await respuesta.json();
