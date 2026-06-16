@@ -15,9 +15,9 @@ function InicioResidente({ usuario }) {
 
   const enviarReporte = async () => {
     if (!reporte.titulo || !reporte.descripcion) return Alert.alert('Atención', 'Llena título y descripción.');
-    try {
-      const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app'; 
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportar`, {
+      try {
+        const DOMINIO = 'https://saferesidenceapp-production.up.railway.app';
+        const respuesta = await fetch(`${DOMINIO}/api/reportar`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -45,8 +45,8 @@ function InicioResidente({ usuario }) {
   const cargarMisReportes = async () => {
     if (!usuario?.id) return;
     try {
-      const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app'; 
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/residente/${usuario.id}`);
+      const DOMINIO = 'https://saferesidenceapp-production.up.railway.app'; 
+      const respuesta = await fetch(`http://${DOMINIO}:8000/api/reportes/residente/${usuario.id}`);
       if (!respuesta.ok) throw new Error('Error del servidor');
       const datos = await respuesta.json();
       setMisReportes(datos);
@@ -199,11 +199,11 @@ function InicioVigilante({ usuario }) {
   // NUEVO ESTADO para enviar novedades
   const [nuevaNovedad, setNuevaNovedad] = useState('');
 
-  const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app';
+  const DOMINIO = 'https://saferesidenceapp-production.up.railway.app';
 
   const cargarCasosActivos = async () => {
     try {
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/activos`);
+      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/activos`);
       if (!respuesta.ok) throw new Error('Error de servidor');
       const datos = await respuesta.json();
       setCasos(datos);
@@ -215,7 +215,7 @@ function InicioVigilante({ usuario }) {
 
   const cargarMisCasos = async () => {
     try {
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/vigilante/${usuario?.id}`);
+      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/vigilante/${usuario?.id}`);
       if (!respuesta.ok) throw new Error('Error de servidor');
       const datos = await respuesta.json();
       setMisCasos(datos);
@@ -228,7 +228,7 @@ function InicioVigilante({ usuario }) {
   const tomarCaso = async (idReporte) => {
     if (!usuario?.id) return Alert.alert('Error', 'No se pudo identificar las credenciales.');
     try {
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/${idReporte}/tomar`, {
+      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/${idReporte}/tomar`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ vigilante_id: usuario.id })
@@ -248,7 +248,7 @@ function InicioVigilante({ usuario }) {
   const enviarNovedad = async (idReporte) => {
     if (!nuevaNovedad) return Alert.alert('Atención', 'Escribe una novedad primero.');
     try {
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/${idReporte}/novedad`, {
+      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/${idReporte}/novedad`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: usuario.id, mensaje: nuevaNovedad })
@@ -396,11 +396,11 @@ function InicioAdmin({ usuario }) {
   const [modalCierre, setModalCierre] = useState(false);
   const [datosCierre, setDatosCierre] = useState({ idReporte: null, solucion: '', aplicarLlamado: false, torre: '', apto: '' });
 
-  const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app';
+  const DOMINIO = 'https://saferesidenceapp-production.up.railway.app';
 
   const cargarTodosLosCasos = async () => {
     try {
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/todos`);
+      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/todos`);
       if (!respuesta.ok) throw new Error('Error al obtener los casos');
 
       let datos = await respuesta.json();
@@ -434,7 +434,7 @@ function InicioAdmin({ usuario }) {
     }
 
     try {
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/${datosCierre.idReporte}/cerrar`, {
+      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/${datosCierre.idReporte}/cerrar`, {
         method: 'PUT',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -463,7 +463,7 @@ function InicioAdmin({ usuario }) {
   const enviarNovedad = async (idReporte) => {
     if (!nuevaNovedad) return Alert.alert('Atención', 'Escribe una novedad primero.');
     try {
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/${idReporte}/novedad`, {
+      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/${idReporte}/novedad`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: usuario.id, mensaje: nuevaNovedad })
@@ -480,7 +480,7 @@ function InicioAdmin({ usuario }) {
   // Carga el Directorio de usuarios desde la base de datos
   const cargarDirectorio = async () => {
     try {
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/directorio`);
+      const respuesta = await fetch(`http://${DOMINIO}/api/directorio`);
       if (!respuesta.ok) throw new Error('Error al obtener el directorio');
 
       const datos = await respuesta.json();
@@ -713,12 +713,12 @@ function PantallaPerfil({ usuario, setUsuario }) {
   const [modalVisible, setModalVisible] = useState(false); 
   const [passwords, setPasswords] = useState({ actual: '', nueva: '', confirmar: '' });
   
-  const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app';
+  const DOMINIO = 'https://saferesidenceapp-production.up.railway.app';
 
   // Función encargada de sincronizar los llamados con la base de datos de Laravel
   const consultarLlamadosAtencion = async () => {
     try {
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/usuarios/${usuario.id}/llamados`);
+      const respuesta = await fetch(`http://${DOMINIO}/api/usuarios/${usuario.id}/llamados`);
       
       if (!respuesta.ok) {
         setErrorLlamados(true); 
@@ -756,7 +756,7 @@ function PantallaPerfil({ usuario, setUsuario }) {
     }
 
     try {
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/usuarios/${usuario.id}/cambiar-password`, {
+      const respuesta = await fetch(`http://${DOMINIO}/api/usuarios/${usuario.id}/cambiar-password`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -899,9 +899,9 @@ function PantallaAuth({ setUsuario }) {
 
   const procesarFormulario = async () => {
     try {
-      const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app'; 
+      const DOMINIO = 'https://saferesidenceapp-production.up.railway.app'; 
       const endpoint = esRegistro ? '/api/registro' : '/api/login';
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000${endpoint}`, {
+      const respuesta = await fetch(`http://${DOMINIO}${endpoint}`, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify(datos)
@@ -1031,11 +1031,11 @@ function PantallaInformes() {
     guardiaTop: 'Sin datos'
   });
 
-  const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app';
+  const DOMINIO = 'https://saferesidenceapp-production.up.railway.app';
 
   const cargarMetricas = async () => {
     try {
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/metricas`);
+      const respuesta = await fetch(`http://${DOMINIO}/api/metricas`);
       if (!respuesta.ok) throw new Error('Error al obtener métricas');
       const data = await respuesta.json();
 
@@ -1206,11 +1206,11 @@ function PantallaHistorico() {
   const [filtroFecha, setFiltroFecha] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('Todos'); 
 
-  const IP_COMPUTADORA = 'saferesidenceapp-production.up.railway.app';
+  const DOMINIO = 'https://saferesidenceapp-production.up.railway.app';
 
   const cargarHistoricoGlobal = async () => {
     try {
-      const respuesta = await fetch(`http://${IP_COMPUTADORA}:8000/api/reportes/todos`);
+      const respuesta = await fetch(`http://${DOMINIO}/api/reportes/todos`);
       if (!respuesta.ok) throw new Error('Error al obtener el historial');
 
       const datos = await respuesta.json();
