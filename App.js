@@ -1007,10 +1007,17 @@ export default function App() {
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.1, 
             shadowRadius: 4, 
-            height: Platform.OS === 'ios' ? 105 : 85, 
-            paddingBottom: Platform.OS === 'ios' ? 40 : 25,
+            height: Platform.OS === 'ios' ? 90 : 65, 
+            paddingBottom: Platform.OS === 'ios' ? 30 : 10,
+            paddingTop: 5,
           },
-          tabBarLabelStyle: { fontSize: 10, fontWeight: '600', textTransform: 'none', marginTop: 2 },
+          tabBarLabelStyle: { 
+            fontSize: 10, 
+            fontWeight: '600', 
+            textTransform: 'none', 
+            // Eliminamos el marginTop y usamos paddingBottom para empujar el texto un poco hacia arriba
+            paddingBottom: Platform.OS === 'android' ? 5 : 0 
+          },
         })}
       >
         <Tab.Screen name="Inicio">{() => <PantallaPrincipal usuario={usuario} />}</Tab.Screen>
