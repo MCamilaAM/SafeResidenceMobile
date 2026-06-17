@@ -4,7 +4,6 @@ import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { PieChart, BarChart } from 'react-native-chart-kit'; 
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // --- 1. PANTALLAS DE INICIO POR ROL ---
 function InicioResidente({ usuario }) {
@@ -982,7 +981,7 @@ export default function App() {
   if (!usuario) {
     return <PantallaAuth setUsuario={setUsuario} />;
   }
-  const insets = useSafeAreaInsets();
+
   return (
     <NavigationContainer>
       <Tab.Navigator
@@ -1001,7 +1000,6 @@ export default function App() {
           tabBarShowIcon: true,
           swipeEnabled: true,
           tabBarIndicatorStyle: { backgroundColor: '#003366', height: 3, top: 0 },
-          
           tabBarStyle: {
             backgroundColor: '#FFFFFF', 
             elevation: 10, 
@@ -1009,8 +1007,8 @@ export default function App() {
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.1, 
             shadowRadius: 4, 
-            height: 60 + insets.bottom, 
-            paddingBottom: insets.bottom > 0 ? insets.bottom : 10, 
+            height: Platform.OS === 'ios' ? 105 : 85, 
+            paddingBottom: Platform.OS === 'ios' ? 40 : 25,
           },
           tabBarLabelStyle: { fontSize: 10, fontWeight: '600', textTransform: 'none', marginTop: 2 },
         })}
